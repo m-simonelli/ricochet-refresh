@@ -24,6 +24,8 @@
 #include <QStandardPaths>
 #include <QTranslator>
 #include <QRandomGenerator>
+#include <QFileInfo>
+#include <QUrl>
 
 // tego
 #include <tego/tego.hpp>

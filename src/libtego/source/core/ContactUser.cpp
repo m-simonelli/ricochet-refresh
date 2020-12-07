@@ -204,6 +204,7 @@ void ContactUser::onConnected()
         m_contactRequest->sendRequest(m_connection);
     }
 
+    /* XXX: is there any point in having this? the setting isn't used anywhere else... */
     if (!m_settings->read("sentUpgradeNotification").isNull())
         m_settings->unset("sentUpgradeNotification");
 

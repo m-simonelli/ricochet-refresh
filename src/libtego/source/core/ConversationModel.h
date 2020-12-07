@@ -108,6 +108,7 @@ private:
     QList<MessageData> messages;
     int m_unreadCount;
 
+    void sendFile(const QString &file_url);
     int indexOfIdentifier(MessageId identifier, bool isOutgoing) const;
     void prune();
 };

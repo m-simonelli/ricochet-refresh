@@ -141,7 +141,8 @@ SOURCES += \
     source/protocol/Connection.cpp \
     source/protocol/ContactRequestChannel.cpp \
     source/protocol/ControlChannel.cpp \
-    source/protocol/OutboundConnector.cpp
+    source/protocol/OutboundConnector.cpp \
+    source/protocol/FileChannel.cpp
 
 HEADERS += \
     source/protocol/AuthHiddenServiceChannel.h \
@@ -152,7 +153,8 @@ HEADERS += \
     source/protocol/Connection_p.h \
     source/protocol/ContactRequestChannel.h \
     source/protocol/ControlChannel.h \
-    source/protocol/OutboundConnector.h
+    source/protocol/OutboundConnector.h \
+    source/protocol/FileChannel.h
 
 include($${QMAKE_INCLUDES}/protobuf.pri)
 
@@ -160,6 +162,7 @@ PROTOS += \
     source/protocol/AuthHiddenService.proto \
     source/protocol/ChatChannel.proto \
     source/protocol/ContactRequestChannel.proto \
-    source/protocol/ControlChannel.proto
+    source/protocol/ControlChannel.proto \
+    source/protocol/FileChannel.proto
 
 include($${QMAKE_INCLUDES}/openssl.pri)

@@ -43,6 +43,11 @@ ChatChannel::ChatChannel(Direction direction, Connection *connection)
 {
     // The peer might use recent message IDs between connections to handle
     // re-send. Start at a random ID to reduce chance of collisions, then increment
+    /* XXX: 
+     *      1. Is there any reason for this to not be UINT64_MAX?
+     *      2. Should the MSB be discarded here for the unlikely case where
+     *         a number is picked near UINT32_MAX to prevent int overflow?
+     */
     lastMessageId = SecureRNG::randomInt(UINT32_MAX);
 }
 

@@ -84,10 +84,22 @@ void ConversationModel::setContact(ContactUser *contact)
     emit contactChanged();
 }
 
+void ConversationModel::sendFile(const QString &file_url) {
+    return;
+}
+
 void ConversationModel::sendMessage(const QString &text)
 {
     if (text.isEmpty())
         return;
+
+    /* XXX: this is just to test file transfer, we can write a nice and pretty
+     * UI later. Format for files is like one would use in a browser, i.e.:
+     * file:///home/username/file.txt */
+    if (text.startsWith(QString::fromLatin1("file://"))) {
+        sendFile(text);
+        return;
+    }
 
     MessageData message(text, QDateTime::currentDateTime(), 0, Queued);
 
