@@ -46,7 +46,7 @@ ChatChannel::ChatChannel(Direction direction, Connection *connection)
     /* XXX: 
      *      1. Is there any reason for this to not be UINT64_MAX?
      *      2. Should the MSB be discarded here for the unlikely case where
-     *         a number is picked near UINT32_MAX to prevent int overflow?
+     *         a number is picked near UINT32_MAX to prevent int wraparound?
      */
     lastMessageId = SecureRNG::randomInt(UINT32_MAX);
 }

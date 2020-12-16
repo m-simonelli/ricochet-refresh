@@ -37,6 +37,7 @@
 #include "AuthHiddenServiceChannel.h"
 #include "ChatChannel.h"
 #include "ContactRequestChannel.h"
+#include "FileChannel.h"
 
 using namespace Protocol;
 
@@ -52,7 +53,7 @@ Channel *Channel::create(const QString &type, Direction direction, Connection *c
     } else if (type == QStringLiteral("im.ricochet.contact.request")) {
         return new ContactRequestChannel(direction, connection);
     } else if (type == QStringLiteral("im.ricochet.file-transfer")) {
-        return new ChatChannel(direction, connection);
+        return new FileChannel(direction, connection);
     } else {
         return 0;
     }

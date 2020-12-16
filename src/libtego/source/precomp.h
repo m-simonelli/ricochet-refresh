@@ -1,3 +1,6 @@
+#ifndef _libtego_source_precomp_h
+#define _libtego_source_precomp_h
+
 #include <QtGlobal>
 
 // C headers
@@ -54,6 +57,8 @@ extern "C" {
 #include <memory>
 #include <thread>
 #include <mutex>
+#include <iostream>
+#include <filesystem>
 
 // fmt
 #include <fmt/format.h>
@@ -132,3 +137,5 @@ namespace tego
 }
 
 #endif //__cplusplus#i
+
+#endif // _libtego_source_precomp_h

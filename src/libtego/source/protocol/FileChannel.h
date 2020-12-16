@@ -36,16 +36,32 @@
 #include "protocol/Channel.h"
 #include "protocol/FileChannel.pb.h"
 
-namespace Protocol {
+namespace Protocol
+{
 
-class FileChannel : Channel {
+class FileChannel : public Channel
+{
     Q_OBJECT;
     Q_DISABLE_COPY(FileChannel);
 
 public:
+    typedef quint32 FileId;
+    static const int FileMaxEncodedChunkSize = 2000;
+    static const int FileMaxDecodedChunkSize = 1500;
+
+    explicit FileChannel(Direction direction, Connection *connection);
+
+    bool sendFile(QString file_url, QDateTime time, FileId &id);
+    bool sendFileWithId(QString file_url, QDateTime time, FileId &id);
+
 signals:
 protected:
+    virtual bool allowInboundChannelRequest(const Data::Control::OpenChannel *request, Data::Control::ChannelResult *result);
+    virtual bool allowOutboundChannelRequest(Data::Control::OpenChannel *request);
+    virtual void receivePacket(const QByteArray &packet);
 private:
+    FileId nextFileId();
+    FileId file_id;
 };
 
 }

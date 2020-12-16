@@ -35,6 +35,7 @@
 
 #include "core/ContactUser.h"
 #include "protocol/ChatChannel.h"
+#include "protocol/FileChannel.h"
 
 class ConversationModel : public QAbstractListModel
 {
@@ -92,6 +93,10 @@ private slots:
 
 private:
     struct MessageData {
+        enum Type {
+            Message,
+            File
+        } type;
         QString text;
         QDateTime time;
         MessageId identifier;

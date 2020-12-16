@@ -20,6 +20,7 @@ src/tests/*/tst_*
 !tst_*.cpp
 !tst_*.h
 *.pb.h
+!src/libtego/include/protocol/*.pb.h
 *.pb.cc
 packaging/installer/Qt
 packaging/installer/Output
