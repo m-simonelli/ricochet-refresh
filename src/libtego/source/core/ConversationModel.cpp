@@ -30,15 +30,22 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "globals.hpp"
+using tego::g_globals;
+
 #include "ConversationModel.h"
 #include "protocol/Connection.h"
 #include "protocol/ChatChannel.h"
 #include "protocol/FileChannel.h"
+#include "utils/SecureRNG.h"
 
 ConversationModel::ConversationModel(QObject *parent)
     : QAbstractListModel(parent)
     , m_contact(0)
+    , messages({})
     , m_unreadCount(0)
+    , lastMessageId(SecureRNG::randomInt(UINT32_MAX))
+
 {
 }
 
@@ -102,7 +109,7 @@ template<typename T> T *channelForContact(ContactUser *contact, Protocol::Channe
     return channel;
 }
 
-void ConversationModel::sendFile(const QString &file_url) {
+tego_message_id_t ConversationModel::sendFile(const QString &file_url) {
     MessageData message(file_url, QDateTime::currentDateTime(), 0, Queued);
 
     if (m_contact->connection()) {
@@ -124,31 +131,28 @@ void ConversationModel::sendFile(const QString &file_url) {
     return;
 }
 
-void ConversationModel::sendMessage(const QString &text)
+tego_message_id_t ConversationModel::sendMessage(const QString &text)
 {
     if (text.isEmpty())
-        return;
+        return 0;
 
     /* XXX: this is just to test file transfer, we can write a nice and pretty
      * UI later. Format for files is like one would use in a browser, i.e.:
      * file:///home/username/file.txt */
     if (text.startsWith(QString::fromLatin1("file://"))) {
-        sendFile(text);
-        return;
+        return sendFile(text);
     }
 
-    MessageData message(text, QDateTime::currentDateTime(), 0, Queued);
+    MessageData message(text, QDateTime::currentDateTime(), lastMessageId++, Queued);
 
     if (m_contact->connection()) {
         auto channel = channelForContact<Protocol::ChatChannel>(m_contact);
 
         if (channel && channel->isOpened()) {
-            MessageId id = 0;
-            if (channel->sendChatMessage(text, QDateTime(), id))
+            if (channel->sendChatMessageWithId(text, QDateTime(), message.identifier))
                 message.status = Sending;
             else
                 message.status = Error;
-            message.identifier = id;
             message.attemptCount++;
         }
     }
@@ -157,6 +161,8 @@ void ConversationModel::sendMessage(const QString &text)
     messages.prepend(message);
     endInsertRows();
     prune();
+
+    return static_cast<tego_message_id_t>(message.identifier);
 }
 
 void ConversationModel::sendQueuedMessages()
@@ -190,16 +196,10 @@ void ConversationModel::sendQueuedMessages()
             bool ok = false;
             switch (messages[i].type) {
                 case ConversationModel::MessageData::Type::Message:
-                    if (messages[i].identifier)
-                        ok = chat_channel->sendChatMessageWithId(messages[i].text, messages[i].time, messages[i].identifier);
-                    else
-                        ok = chat_channel->sendChatMessage(messages[i].text, messages[i].time, messages[i].identifier);
+                    ok = chat_channel->sendChatMessageWithId(messages[i].text, messages[i].time, messages[i].identifier);
                     break;
                 case ConversationModel::MessageData::Type::File:
-                    if (messages[i].identifier)
-                        ok = file_channel->sendFileWithId(messages[i].text, messages[i].time, messages[i].identifier);
-                    else
-                        ok = file_channel->sendFile(messages[i].text, messages[i].time, messages[i].identifier);
+                    ok = file_channel->sendFileWithId(messages[i].text, messages[i].time, messages[i].identifier);
                     break;
                 default:
                     /* XXX: Should this be BUG()? */
@@ -252,6 +252,19 @@ void ConversationModel::messageReceived(const QString &text, const QDateTime &ti
 
     m_unreadCount++;
     emit unreadCountChanged();
+
+    {
+        // convert QString to raw utf8
+        auto utf8Text = text.toUtf8();
+        auto rawText = std::make_unique<char[]>(utf8Text.size() + 1);
+        std::copy(utf8Text.begin(), utf8Text.end(), rawText.get());
+
+        auto userId = this->m_contact->toTegoUserId();
+
+        logger::println("Received Message : {}", rawText.get());
+
+        g_globals.context->callback_registry_.emit_message_received(userId.release(), time.toMSecsSinceEpoch(), static_cast<tego_message_id_t>(id), rawText.release(), utf8Text.size());
+    }
 }
 
 void ConversationModel::messageAcknowledged(MessageId id, bool accepted)
@@ -263,6 +276,17 @@ void ConversationModel::messageAcknowledged(MessageId id, bool accepted)
     MessageData &data = messages[row];
     data.status = accepted ? Delivered : Error;
     emit dataChanged(index(row, 0), index(row, 0));
+
+    {
+        // convert our hostname to just the service id raw string
+        auto serviceIdString = m_contact->hostname().left(TEGO_V3_ONION_SERVICE_ID_LENGTH).toUtf8();
+        // ensure valid service id
+        auto serviceId = std::make_unique<tego_v3_onion_service_id>(serviceIdString.data(), serviceIdString.size());
+        // create user id object from service id
+        auto userId = std::make_unique<tego_user_id>(*serviceId.get());
+
+        g_globals.context->callback_registry_.emit_message_acknowledged(userId.release(), static_cast<tego_message_id_t>(id), (accepted ? TEGO_TRUE : TEGO_FALSE));
+    }
 }
 
 void ConversationModel::outboundChannelClosed()

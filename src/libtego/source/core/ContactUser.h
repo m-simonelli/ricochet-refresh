@@ -72,7 +72,7 @@ public:
         Offline,
         RequestPending,
         RequestRejected,
-        Outdated
+        Outdated    // this doesn't seem to actually be used
     };
 
     UserIdentity * const identity;
@@ -100,6 +100,8 @@ public:
     class SettingsObject *settings();
 
     Q_INVOKABLE void deleteContact();
+
+    std::unique_ptr<tego_user_id_t> toTegoUserId() const;
 
 public slots:
     /* Assign a connection to this user

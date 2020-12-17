@@ -1,6 +1,8 @@
 #ifndef TEGO_H
 #define TEGO_H
 
+// TODO: switch to east-const
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -267,17 +269,52 @@ void tego_user_id_get_v3_onion_service_id(
     tego_v3_onion_service_id_t** out_serviceId,
     tego_error_t** error);
 
-// TODO: figure out which statuses we need later
-typedef enum
-{
-    tego_user_status_none    = 0,
-    tego_user_status_online  = TEGO_FLAG(0),
-    tego_user_status_offline = TEGO_FLAG(1),
-} tego_user_status_t;
-
 //
 // contacts/user methods
 //
+
+/*
+ * Get the host's user_id (derived from private key)
+ *
+ * @param context : the current tego context
+ * @param out_hostUser : returned user id
+ * @param error : filled on error
+ */
+void tego_context_get_host_user_id(
+    const tego_context_t* context,
+    tego_user_id_t** out_hostUser,
+    tego_error_t** error);
+
+// state of the host user, encapsulates all of the tor daemon launch,
+// network connection, and onion service creation into 'connecting'
+// TODO: squish these into the tego_user_status_t ?
+typedef enum
+{
+    tego_host_user_state_unknown,
+    tego_host_user_state_offline,
+    tego_host_user_state_connecting,
+    tego_host_user_state_online,
+} tego_host_user_state_t;
+
+/*
+ * Get the current state of the host user
+ *
+ * @param context : the current tego context
+ * @param out_state : destination to save state
+ * @param error : filled  on error
+ */
+void tego_context_get_host_user_state(
+    const tego_context_t* context,
+    tego_host_user_state_t* out_state,
+    tego_error_t** error);
+
+// TODO: figure out which statuses we need later
+typedef enum
+{
+    tego_user_status_none,
+    tego_user_status_online,
+    tego_user_status_offline,
+} tego_user_status_t;
 
 /*
  * Get a user's current user status
@@ -296,23 +333,37 @@ void tego_context_get_user_status(
 // enum for user type
 typedef enum
 {
-    tego_user_type_allowed, // in our contact list
-    tego_user_type_blocked, // in our block list
+    tego_user_type_host, // the host user
+    tego_user_type_allowed, // in host's contact list
+    tego_user_type_blocked, // in host's block list
     tego_user_type_pending, // users the host has added but who have not replied yet
     tego_user_type_requesting, // users who have added host but the host has not replied yet
+    tego_user_type_rejected, // user the host has added but replied with rejection
 } tego_user_type_t;
+
+/*
+ * Get the type of a given user
+ *
+ * @param context : the current tego context
+ * @param user : the given user
+ * @param out_type : filled with type on success
+ * @param error : filled on error
+ */
+void tego_context_get_user_type(
+    const tego_context_t* context,
+    const tego_user_id_t* user,
+    tego_user_type_t* out_type,
+    tego_error_t** error);
 
 /*
  * Get the number of users managed by our tego context
  *
  * @param context : the current tego context
- * @param userType : the type of user we want to count
- * @param out_userCount : gets the number of users with the given type
+ * @param out_userCount : gets the number of users
  * @param error : filled on error
  */
 void tego_context_get_user_count(
     const tego_context_t* context,
-    tego_user_type_t userType,
     size_t* out_userCount,
     tego_error_t** error);
 
@@ -320,7 +371,6 @@ void tego_context_get_user_count(
  * Get all of our users of a given type
  *
  * @param context : the current tego context
- * @param userType : the user type we want to filter by
  * @param out_usersBuffer : destination buffer to store returned user id pointers
  * @param usersBufferLength : maximum nuber of users that can be written to
  *  out_usersBuffer
@@ -329,10 +379,9 @@ void tego_context_get_user_count(
  */
 void tego_context_get_users(
     const tego_context_t* context,
-    tego_user_type_t userType,
     tego_user_id_t** out_usersBuffer,
     size_t usersBufferLength,
-    size_t* out_usersCount,
+    size_t* out_userCount,
     tego_error_t** error);
 
 //
@@ -381,8 +430,150 @@ void tego_context_start_tor(
 
 typedef struct tego_tor_daemon_config tego_tor_daemon_config_t;
 
+/*
+ * Determine whether the tor daemon has an existing torrc and
+ * is already configured
+ *
+ * @param context : the current tego context
+ * @param out_configured : destination for result, TEGO_TRUE if has config, else TEGO_FALSE
+ * @param error : filled on error
+ */
+void tego_context_get_tor_daemon_configured(
+    const tego_context_t* context,
+    tego_bool_t* out_configured,
+    tego_error_t** error);
+
+/*
+ * Returns a tor daemon config struct with default params
+ *
+ * @param out_config : destination for config
+ * @param error : filled on error
+ */
 void tego_tor_daemon_config_initialize(
     tego_tor_daemon_config_t** out_config,
+    tego_error_t** error);
+
+/*
+ * Set the DisableNetwork flag (see Tor Manual :
+ *  www.torproject.org/docs/tor-manual.html )
+ *
+ * @param config : config to update
+ * @param disableNetwork : TEGO_TRUE or TEGO_FALSE
+ * @param error : filled on error
+ */
+void tego_tor_daemon_config_set_disable_network(
+    tego_tor_daemon_config_t* config,
+    tego_bool_t disableNetwork,
+    tego_error_t** error);
+
+/*
+ * Set up SOCKS4 proxy params, overwrites any existing
+ * proxy settings
+ *
+ * @param config : config to update
+ * @param address : proxy addess as encoded utf8 string
+ * @param addressLength : length of the address not counting
+ *  the null terminator
+ * @param port : proxy port, 0 not allowed
+ * @param error : filled on error
+ */
+void tego_tor_daemon_config_set_proxy_socks4(
+    tego_tor_daemon_config_t* config,
+    const char* address,
+    size_t addressLength,
+    uint16_t port,
+    tego_error_t** error);
+
+/*
+ * Set up SOCKS5 proxy params, overwrites any existing
+ * proxy settings
+ *
+ * @param config : config to update
+ * @param address : proxy addess encoded as utf8 string
+ * @param addressLength : length of the address not counting
+ *  any NULL terminator
+ * @param port : proxy port, 0 not allowed
+ * @param username : authentication username encoded as utf8
+ *  string, may be NULL or empty string if not needed
+ * @param usernameLength : length of username string not counting
+ *  any NULL terminator
+ * @param password : authentication password encoded as utf8
+ *  string, may be NULL or empty string if not needed
+ * @param passwordLength : lenght of the password string not
+ *  counting any NULL terminator
+ * @param error : filled on error
+ */
+void tego_tor_daemon_config_set_proxy_socks5(
+    tego_tor_daemon_config_t* config,
+    const char* address,
+    size_t addressLength,
+    uint16_t port,
+    const char* username,
+    size_t usernameLength,
+    const char* password,
+    size_t passwordLength,
+    tego_error_t** error);
+
+/*
+ * Set up HTTPS proxy params, overwrites any existing
+ * proxy settings
+ *
+ * @param config : config to update
+ * @param address : proxy addess encoded as utf8 string
+ * @param addressLength : length of the address not counting
+ *  any NULL terminator
+ * @param port : proxy port, 0 not allowed
+ * @param username : authentication username encoded as utf8
+ *  string, may be NULL or empty string if not needed
+ * @param usernameLength : length of username string not counting
+ *  any NULL terminator
+ * @param password : authentication password encoded as utf8
+ *  string, may be NULL or empty string if not needed
+ * @param passwordLength : lenght of the password string not
+ *  counting any NULL terminator
+ * @param error : filled on error
+ */
+void tego_tor_daemon_config_set_proxy_https(
+    tego_tor_daemon_config_t* config,
+    const char* address,
+    size_t addressLength,
+    uint16_t port,
+    const char* username,
+    size_t usernameLength,
+    const char* password,
+    size_t passwordLength,
+    tego_error_t** error);
+
+/*
+ * Set the allowed ports the tor daemon may use
+ *
+ * @param config : config to update
+ * @param ports : array of allowed ports
+ * @param portsCount : the number of ports in list
+ * @param error : filled on error
+ */
+void tego_tor_daemon_config_set_allowed_ports(
+    tego_tor_daemon_config_t* config,
+    const uint16_t* ports,
+    size_t portsCount,
+    tego_error_t** error);
+
+/*
+ * Set the list of bridges for tor to use
+ *
+ * @param config : config to update
+ * @param bridges : array of utf8 encoded bridge strings
+ * @param bridgeLengths : array of lengths of the strings stored
+ *  in 'bridges', does not include any NULL terminators
+ * @param bridgeCount : the number of bridge strings being
+ *  passed in
+ * @param error : filled on error
+ */
+void tego_tor_daemon_config_set_bridges(
+    tego_tor_daemon_config_t* config,
+    const char** bridges,
+    size_t* bridgeLengths,
+    size_t bridgeCount,
     tego_error_t** error);
 
 /*
@@ -430,22 +621,10 @@ void tego_context_stop_tor(
  */
 void tego_context_start_service(
     tego_context_t* context,
-    const tego_ed25519_private_key_t* hostPrivateKey,
-    const tego_user_id_t** userBuffer,
-    const tego_user_type_t** userTypeBuffer,
+    tego_ed25519_private_key_t const* hostPrivateKey,
+    tego_user_id_t const* const* userBuffer,
+    tego_user_type_t const* const* userTypeBuffer,
     size_t userCount,
-    tego_error_t** error);
-
-/*
- * Get the host's private key
- *
- * @param context : the current tego context
- * @param out_hostPrivateKey : the returned private key
- * @param error : filled on error
- */
-void tego_context_get_host_private_key(
-    tego_context_t* context,
-    tego_ed25519_private_key_t** out_hostPrivateKey,
     tego_error_t** error);
 
 /*
@@ -455,6 +634,18 @@ void tego_context_get_host_private_key(
  * @param error : filled on error */
 void tego_context_stop_service(
     tego_context_t* context,
+    tego_error_t** error);
+
+/*
+ * Returns the number of charactres required (including null) to
+ * write out the tor logs
+ *
+ * @param context : the current tego context
+ * @param error : filled on error
+ * @return : the number of characters required
+ */
+size_t tego_context_get_tor_logs_size(
+    const tego_context_t* context,
     tego_error_t** error);
 
 /*
@@ -485,28 +676,6 @@ const char* tego_context_get_tor_version_string(
     const tego_context_t* context,
     tego_error_t** error);
 
-// various tor state flags currently exposed in ricochet ui
-typedef enum
-{
-    tego_tor_state_none                 = 0,
-    tego_tor_state_running              = TEGO_FLAG(0),
-    tego_tor_state_control_connected    = TEGO_FLAG(1),
-    tego_tor_state_circuits_established = TEGO_FLAG(2),
-    tego_tor_state_onion_service_online = TEGO_FLAG(3),
-} tego_tor_state_flags_t;
-
-/*
- * Get current tor state flags
- *
- * @param context : the current tego context
- * @param out_stateFlags : destination to save flags
- * @param error : filled on error
- */
-void tego_context_get_tor_state_flags(
-    const tego_context_t* context,
-    tego_tor_state_flags_t* out_stateFlags,
-    tego_error_t** error);
-
 // corresponds to Ricochet's Tor::TorControl::Status enum
 typedef enum
 {
@@ -529,24 +698,46 @@ void tego_context_get_tor_control_status(
     tego_tor_control_status_t* out_status,
     tego_error_t** error);
 
-// corresponds to Ricochet's Tor::TorControl::TorStatus enum
 typedef enum
 {
-    tego_tor_daemon_status_unknown,
-    tego_tor_daemon_status_offline,
-    tego_tor_daemon_status_ready,
-} tego_tor_daemon_status_t;
+    tego_tor_process_status_unknown,
+    tego_tor_process_status_external,
+    tego_tor_process_status_not_started,
+    tego_tor_process_status_starting,
+    tego_tor_process_status_running,
+    tego_tor_process_status_failed,
+} tego_tor_process_status_t;
 
 /*
- * Get the current status of the tor daemon
+ * Get the current status of the tor daemon process
  *
  * @param context : the current tego context
- * @param out_status : out_status destination to save daemon status
+ * @param out_status : destination to write process status
  * @param error : filled on error
  */
-void tego_context_get_tor_daemon_status(
+void tego_context_get_tor_process_status(
     const tego_context_t* context,
-    tego_tor_daemon_status_t* out_status,
+    tego_tor_process_status_t* out_status,
+    tego_error_t** error);
+
+typedef enum
+{
+    tego_tor_network_status_unknown,
+    tego_tor_network_status_ready,
+    tego_tor_network_status_offline,
+} tego_tor_network_status_t;
+
+/*
+ * Get the current status of the tor daemon's connection
+ * to the tor network
+ *
+ * @param context : the current tego context
+ * @param out_status : destination to save network status
+ * @param error : filled on error
+ */
+void tego_context_get_tor_network_status(
+    const tego_context_t* context,
+    tego_tor_network_status_t* out_status,
     tego_error_t** error);
 
 // see https://gitweb.torproject.org/torspec.git/tree/control-spec.txt#n3867
@@ -612,13 +803,19 @@ void tego_context_get_tor_bootstrap_status(
 // Tego Chat Methods
 //
 
+// milliseconds since 1970-01-01T00:00:00 utc.
+typedef uint64_t tego_time_t;
+// unique (per user) identifier
+typedef uint64_t tego_message_id_t;
+
 /*
  * Send a text message from the host to the given user
  *
  * @param context : the current tego context
  * @param user : the user to send a message to
  * @param mesage : utf8 text message to send
- * @param messageLength : length of message including null-terminator
+ * @param messageLength : length of message not including null-terminator
+ * @param out_id : filled with assigned message id for callbacks
  * @param error : filled on error
  */
 void tego_context_send_message(
@@ -626,6 +823,7 @@ void tego_context_send_message(
     tego_user_id_t* user,
     const char* message,
     size_t messageLength,
+    tego_message_id_t* out_id,
     tego_error_t** error);
 
 /*
@@ -646,11 +844,15 @@ void tego_context_confirm_chat_request(
  *
  * @param context : the current tego context
  * @param user : the user we want to chat with
+ * @param mesage : utf8 text greeting message to send
+ * @param messageLength : length of message not including null-terminator
  * @param error : filled on error
  */
 void tego_context_send_chat_request(
     tego_context_t* context,
     const tego_user_id_t* user,
+    const char* message,
+    size_t messageLength,
     tego_error_t** error);
 
 /*
@@ -709,16 +911,6 @@ typedef void (*tego_tor_error_occurred_callback_t)(
     const tego_error_t* error);
 
 /*
- * Callback fired when the one of the tor state flags changes
- *
- * @param context : the current tego context
- * @param stateFlogs : the current state flags for our context's tor instance
- */
-typedef void (*tego_tor_state_changed_callback_t)(
-    tego_context_t* context,
-    tego_tor_state_flags_t stateFlags);
-
-/*
  * TODO: this should go away and only exists for the ricochet Qt UI :(
  *  saving the daemon config should probably just be synchrynous
  * Callback fired after we attempt to save the tor configuration
@@ -741,14 +933,24 @@ typedef void (*tego_tor_control_status_changed_callback_t)(
     tego_tor_control_status_t status);
 
 /*
- * Callback fired when the tor daemon's status changes
+ * Callback fired when the tor daemon process' status changes
  *
  * @param context : the current tego context
- * @param status : the new daemon status
+ * @param status : the new process status
  */
-typedef void (*tego_tor_daemon_status_changed_callback_t)(
+typedef void (*tego_tor_process_status_changed_callback_t)(
     tego_context_t* context,
-    tego_tor_daemon_status_t status);
+    tego_tor_process_status_t status);
+
+/*
+ * Callback fired when the tor daemon's network status changes
+ *
+ * @param context : the current tego context
+ * @param status : the new network status
+ */
+typedef void (*tego_tor_network_status_changed_callback_t)(
+    tego_context_t* context,
+    tego_tor_network_status_t status);
 
 /*
  * Callback fired when tor's bootstrap status changes
@@ -767,7 +969,7 @@ typedef void (*tego_tor_bootstrap_status_changed_callback_t)(
  *
  * @param context : the current tego context
  * @param message : a null-terminated log entry string
- * @param messageLength : length of the message including null-terminator
+ * @param messageLength : length of the message not including null-terminator
  */
 typedef void (*tego_tor_log_received_callback_t)(
     tego_context_t* context,
@@ -775,12 +977,22 @@ typedef void (*tego_tor_log_received_callback_t)(
     size_t messageLength);
 
 /*
+ * Callback fired when the host user state changes
+ *
+ * @param context : the current tego context
+ * @param state : the current host user state
+ */
+typedef void (*tego_host_user_state_changed_callback_t)(
+    tego_context_t* context,
+    tego_host_user_state_t state);
+
+/*
  * Callback fired when the host receives a chat request from another user
  *
  * @param context : the current tego context
  * @param sender : the user that wants to chat
  * @param message : null-terminated message string received from the requesting user
- * @param messageLength : length of the message including null-terminator
+ * @param messageLength : length of the message not including null-terminator
  */
 typedef void (*tego_chat_request_received_callback_t)(
     tego_context_t* context,
@@ -807,14 +1019,33 @@ typedef void (*tego_chat_request_response_received_callback_t)(
  *
  * @param context : the current tego context
  * @param sender : the user that sent host the message
+ * @param timestamp : the time the message was sent
+ * @param messageId : id of the message received
  * @param message : null-terminated message string
- * @param messageLength : length of the message including null-terminator
+ * @param messageLength : length of the message not including null-terminator
  */
 typedef void (*tego_message_received_callback_t)(
     tego_context_t* context,
     const tego_user_id_t* sender,
+    tego_time_t timestamp,
+    tego_message_id_t messageId,
     const char* message,
     size_t messageLength);
+
+/*
+ * Callback fired when a chat message is received an acknowledge
+ * by the recipient
+ *
+ * @param context : the current tego context
+ * @param userId : the user the message was sent to
+ * @param messageId : id of the message being acknowledged
+ * @param messageAccepted : TEGO_TRUE if accepted, TEGO_FALSE otherwise
+ */
+typedef void (*tego_message_acknowledged_callback_t)(
+    tego_context_t* context,
+    const tego_user_id_t* userId,
+    tego_message_id_t messageId,
+    tego_bool_t messageAccepted);
 
 /*
  * Callback fired when a user's status changes
@@ -848,11 +1079,6 @@ void tego_context_set_tor_error_occurred_callback(
     tego_tor_error_occurred_callback_t,
     tego_error_t** error);
 
-void tego_context_set_tor_state_changed_callback(
-    tego_context_t* context,
-    tego_tor_state_changed_callback_t,
-    tego_error_t** error);
-
 void tego_context_set_update_tor_daemon_config_succeeded_callback(
     tego_context_t* context,
     tego_update_tor_daemon_config_succeeded_callback_t,
@@ -863,9 +1089,14 @@ void tego_context_set_tor_control_status_changed_callback(
     tego_tor_control_status_changed_callback_t,
     tego_error_t** error);
 
-void tego_context_set_tor_daemon_status_changed_callback(
+void tego_context_set_tor_process_status_changed_callback(
     tego_context_t* context,
-    tego_tor_daemon_status_changed_callback_t,
+    tego_tor_process_status_changed_callback_t,
+    tego_error_t** error);
+
+void tego_context_set_tor_network_status_changed_callback(
+    tego_context_t* context,
+    tego_tor_network_status_changed_callback_t,
     tego_error_t** error);
 
 void tego_context_set_tor_bootstrap_status_changed_callback(
@@ -876,6 +1107,11 @@ void tego_context_set_tor_bootstrap_status_changed_callback(
 void tego_context_set_tor_log_received_callback(
     tego_context_t* context,
     tego_tor_log_received_callback_t,
+    tego_error_t** error);
+
+void tego_context_set_host_user_state_changed_callback(
+    tego_context_t* context,
+    tego_host_user_state_changed_callback_t,
     tego_error_t** error);
 
 void tego_context_set_chat_request_received_callback(
@@ -891,6 +1127,11 @@ void tego_context_set_chat_request_response_received_callback(
 void tego_context_set_message_received_callback(
     tego_context_t* context,
     tego_message_received_callback_t,
+    tego_error_t** error);
+
+void tego_context_set_message_acknowledged_callback(
+    tego_context_t* context,
+    tego_message_acknowledged_callback_t,
     tego_error_t** error);
 
 void tego_context_set_user_status_changed_callback(

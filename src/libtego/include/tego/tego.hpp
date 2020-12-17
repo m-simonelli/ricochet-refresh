@@ -30,6 +30,7 @@ namespace tego
         {
             if (error_ != nullptr)
             {
+                logger::println("exception thrown : {}", tego_error_get_message(error_));
                 std::runtime_error ex(tego_error_get_message(error_));
                 tego_error_delete(error_);
                 error_ = nullptr;
@@ -63,4 +64,5 @@ TEGO_DEFAULT_DELETE_IMPL(tego_ed25519_signature)
 TEGO_DEFAULT_DELETE_IMPL(tego_v3_onion_service_id)
 TEGO_DEFAULT_DELETE_IMPL(tego_tor_launch_config);
 TEGO_DEFAULT_DELETE_IMPL(tego_tor_daemon_config);
+TEGO_DEFAULT_DELETE_IMPL(tego_user_id);
 
