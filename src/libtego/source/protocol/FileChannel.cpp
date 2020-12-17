@@ -36,6 +36,9 @@
 #include "utils/SecureRNG.h"
 #include "utils/Useful.h"
 #include "precomp.h"
+#include "context.hpp"
+#include "error.hpp"
+#include "globals.hpp"
 
 using namespace Protocol;
 
@@ -44,13 +47,13 @@ FileChannel::FileChannel(Direction direction, Connection *connection)
 {
 }
 
-/* XXX: remove this once the below functions are implemented */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 FileChannel::FileId FileChannel::nextFileId() {
     return ++file_id;
 }
 
+/* XXX: remove this once the below functions are implemented */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 bool FileChannel::allowInboundChannelRequest(const Data::Control::OpenChannel *request, Data::Control::ChannelResult *result)
 {
     return false;
@@ -60,12 +63,82 @@ bool FileChannel::allowOutboundChannelRequest(Data::Control::OpenChannel *reques
 {
     return false;
 }
+#pragma GCC diagnostic pop
 
 void FileChannel::receivePacket(const QByteArray &packet)
 {
-    return;
+    Data::File::Packet message;
+    if (!message.ParseFromArray(packet.constData(), packet.size())) {
+        closeChannel();
+        return;
+    }
+
+    if (message.has_file_header()) {
+        handleFileHeader(message.file_header());
+    } else if (message.has_file_chunk()) {
+        handleFileChunk(message.file_chunk());
+    } else if (message.has_file_ack()) {
+        handleFileAck(message.file_ack());
+    } else if (message.has_file_header_ack()) {
+        handleFileHeaderAck(message.file_header_ack());    
+    } else {
+        qWarning() << "Unrecognized file packet on " << type();
+        closeChannel();
+    }
 }
-#pragma GCC diagnostic pop
+
+void handleFileHeader(const Data::File::FileHeader &message){
+    std::unique_ptr<Data::File::FileHeaderAck> response = std::make_unique<Data::File::FileHeaderAck>();
+    std::time_t time;
+    Data::File::Packet packet;
+
+    if (direction() != Inbound) {
+        qWarning() << "Rejected inbound message (FileHeader) on an outbound channel";
+        response->set_accepted(false);
+    } else if (!message.has_size() && !message.has_chunk_count()) {
+        /* rationale:
+         *  - if there's no size, we know when we've reached the end when cur_chunk == n_chunks
+         *  - if there's no chunk count, we know when we've reached the end when total_bytes >= size
+         *  - if there's neither, size cannot be determined */
+        /* TODO: given ^, are both actually needed? */
+        qWarning() << "Rejected file header with no way to determine size";
+        response->set_accepted(false);
+    } else if (!message.has_sha256()) {
+        qWarning() << "Rejected file header with missing hash (sha256) - cannot validate";
+        response->set_accepted(false);
+    } else if (!message.has_file_id()) {
+        qWarning() << "Rejected file header with missing id";
+        response->set_accepted(false);
+    } else {
+        time = std::time(nullptr);
+        response->set_accepted(true);
+    }
+
+    /* Use the file id as name if none is given */
+    if (!message.has_name() && response->accepted()) {
+        message.set_name(std::string::to_string(message.file_id()));
+    }
+
+    /* send the response */
+    response->set_file_id(message.file_id());
+    packet.set_allocated_file_ack(response.take());
+    Channel::sendMessage(packet);
+}
+
+void handleFileChunk(const Data::Chat::FileChunk &message){
+    /* not implemented yet */
+    TEGO_THROW_IF_FALSE(false);
+}
+
+void handleFileAck(const Data::Chat::FileChunkAck &message){
+    /* not implemented yet */
+    TEGO_THROW_IF_FALSE(false);
+}
+
+void handleFileHeaderAck(const Data::Chat::FileChunkAck &message){
+    /* not implemented yet */
+    TEGO_THROW_IF_FALSE(false);
+}
 
 bool FileChannel::sendFile(QString file_url, QDateTime time, FileId &id) {
     id = nextFileId();
@@ -157,5 +230,6 @@ bool FileChannel::sendFileWithId(QString file_url,
         chunk.close();
     }
 
+    /* TODO: send the file - this requires channel/packet handling first */
     return false;
 }

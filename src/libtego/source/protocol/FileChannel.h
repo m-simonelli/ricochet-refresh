@@ -62,6 +62,11 @@ protected:
 private:
     FileId nextFileId();
     FileId file_id;
+
+    void handleFileHeader(const Data::File::FileHeader &message);
+    void handleFileChunk(const Data::Chat::FileChunk &message);
+    void handleFileAck(const Data::Chat::FileChunkAck &message);
+    void handleFileHeaderAck(const Data::Chat::FileChunkAck &message);
 };
 
 }
