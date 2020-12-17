@@ -128,17 +128,17 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
 }
 
 void FileChannel::handleFileChunk(__attribute__((unused)) const Data::File::FileChunk &message){
-    /* not implemented yet */
+    /* not implemented yet, this should never be called as of now */
     TEGO_THROW_IF_FALSE(false);
 }
 
 void FileChannel::handleFileAck(__attribute__((unused)) const Data::File::FileChunkAck &message){
-    /* not implemented yet */
+    /* not implemented yet, this should never be called as of now */
     TEGO_THROW_IF_FALSE(false);
 }
 
 void FileChannel::handleFileHeaderAck(__attribute__((unused)) const Data::File::FileHeaderAck &message){
-    /* not implemented yet */
+    /* not implemented yet, this should never be called as of now */
     TEGO_THROW_IF_FALSE(false);
 }
 

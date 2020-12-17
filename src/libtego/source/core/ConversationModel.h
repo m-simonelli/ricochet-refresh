@@ -77,6 +77,7 @@ public:
     virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
 
 public slots:
+    tego_message_id_t sendFile(const QString &file_url);
     tego_message_id_t sendMessage(const QString &text);
     void clear();
 
@@ -113,7 +114,6 @@ private:
     QList<MessageData> messages;
     int m_unreadCount;
 
-    void sendFile(const QString &file_url);
     // The peer might use recent message IDs between connections to handle
     // re-send. Start at a random ID to reduce chance of collisions, then increment
     MessageId lastMessageId;

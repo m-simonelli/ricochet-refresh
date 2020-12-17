@@ -111,6 +111,7 @@ template<typename T> T *channelForContact(ContactUser *contact, Protocol::Channe
 
 tego_message_id_t ConversationModel::sendFile(const QString &file_url) {
     MessageData message(file_url, QDateTime::currentDateTime(), 0, Queued);
+    message.type = ConversationModel::MessageData::Type::File;
 
     if (m_contact->connection()) {
         auto channel = channelForContact<Protocol::FileChannel>(m_contact);
@@ -126,9 +127,12 @@ tego_message_id_t ConversationModel::sendFile(const QString &file_url) {
         }
     }
 
+    beginInsertRows(QModelIndex(), 0, 0);
+    messages.prepend(message);
+    endInsertRows();
+    prune();
 
-
-    return;
+    return static_cast<tego_message_id_t>(message.identifier);
 }
 
 tego_message_id_t ConversationModel::sendMessage(const QString &text)
