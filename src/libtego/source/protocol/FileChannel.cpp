@@ -87,7 +87,7 @@ void FileChannel::receivePacket(const QByteArray &packet)
     }
 }
 
-void handleFileHeader(const Data::File::FileHeader &message){
+void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
     std::unique_ptr<Data::File::FileHeaderAck> response = std::make_unique<Data::File::FileHeaderAck>();
     std::time_t time;
     Data::File::Packet packet;
@@ -115,27 +115,29 @@ void handleFileHeader(const Data::File::FileHeader &message){
     }
 
     /* Use the file id as name if none is given */
-    if (!message.has_name() && response->accepted()) {
-        message.set_name(std::string::to_string(message.file_id()));
-    }
+    /* FIXME: this won't work since it's const, and there's probably a better
+     * way of going about this */
+    /*if (!message.has_name() && response->accepted()) {
+        message.set_name(std::to_string(message.file_id()));
+    }*/
 
     /* send the response */
     response->set_file_id(message.file_id());
-    packet.set_allocated_file_ack(response.take());
+    packet.set_allocated_file_header_ack(std::move(response).get());
     Channel::sendMessage(packet);
 }
 
-void handleFileChunk(const Data::Chat::FileChunk &message){
+void FileChannel::handleFileChunk(__attribute__((unused)) const Data::File::FileChunk &message){
     /* not implemented yet */
     TEGO_THROW_IF_FALSE(false);
 }
 
-void handleFileAck(const Data::Chat::FileChunkAck &message){
+void FileChannel::handleFileAck(__attribute__((unused)) const Data::File::FileChunkAck &message){
     /* not implemented yet */
     TEGO_THROW_IF_FALSE(false);
 }
 
-void handleFileHeaderAck(const Data::Chat::FileChunkAck &message){
+void FileChannel::handleFileHeaderAck(__attribute__((unused)) const Data::File::FileHeaderAck &message){
     /* not implemented yet */
     TEGO_THROW_IF_FALSE(false);
 }

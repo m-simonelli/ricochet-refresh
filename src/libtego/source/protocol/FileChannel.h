@@ -46,6 +46,7 @@ class FileChannel : public Channel
 
 public:
     typedef quint32 FileId;
+    /* base64 has 4/3 overhead */
     static const int FileMaxEncodedChunkSize = 2000;
     static const int FileMaxDecodedChunkSize = 1500;
 
@@ -64,9 +65,9 @@ private:
     FileId file_id;
 
     void handleFileHeader(const Data::File::FileHeader &message);
-    void handleFileChunk(const Data::Chat::FileChunk &message);
-    void handleFileAck(const Data::Chat::FileChunkAck &message);
-    void handleFileHeaderAck(const Data::Chat::FileChunkAck &message);
+    void handleFileChunk(const Data::File::FileChunk &message);
+    void handleFileAck(const Data::File::FileChunkAck &message);
+    void handleFileHeaderAck(const Data::File::FileHeaderAck &message);
 };
 
 }
