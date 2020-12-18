@@ -85,10 +85,9 @@ message FileHeaderAck {
     optional bool accepted = 2 [default = false];
     enum Reason {
         HEADER_ACK_ACCEPT = 0;
-        HEADER_ACK_REFUSE_NO_FILE_ID = 1;
-        HEADER_ACK_REFUSE_NO_SIZE = 2;
-        HEADER_ACK_REFUSE_NO_NAME = 3;
-        HEADER_ACK_REFUSE_OTHER = 4;
+        HEADER_ACK_REFUSE_NO_SIZE = 1;
+        HEADER_ACK_REFUSE_NO_NAME = 2;
+        HEADER_ACK_REFUSE_OTHER = 3;
     }
     optional Reason reason = 3 [default = HEADER_ACK_REFUSE_OTHER];
 }
