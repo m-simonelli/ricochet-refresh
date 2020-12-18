@@ -45,7 +45,7 @@ message FileHeader {
     optional uint64 file_id = 1;
     optional uint64 size = 2;
     optional string name = 3;
-    optional string sha256 = 4;
+    optional bytes sha3_512 = 4;
     optional uint64 chunk_count = 5;
     optional int32 time_delta = 6;
 }
@@ -55,7 +55,7 @@ message FileHeader {
  * corrupted in transit, only the bad chunk will need to be resent, rather
  * than discarding the entire file */
 message FileChunk {
-    optional string sha256 = 1;     /* sha256 of the decoded chunk */
+    optional bytes sha3_512 = 1;     /* sha3_512 of the decoded chunk */
     optional uint64 file_id = 2;
     optional uint64 chunk_id = 3;
     optional uint32 chunk_size = 4; /* size of the encoded chunk */
@@ -69,8 +69,8 @@ message FileChunkAck {
         CHUNK_ACK_ACCEPT = 0;
         /* the sender should resend the header */
         CHUNK_ACK_REFUSE_NO_MATCHING_FILE_HDR = 1;
-        /* the sender should resend the chunk (and possibly recheck the sha256) */
-        CHUNK_ACK_REFUSE_SHA256 = 2;
+        /* the sender should resend the chunk (and possibly recheck the sha3_512) */
+        CHUNK_ACK_REFUSE_SHA3_512 = 2;
         /* the sender should shrink the chunk */
         CHUNK_ACK_REFUSE_OVER_SIZE = 3;
         /* the sender should resend the chunk */
@@ -87,7 +87,8 @@ message FileHeaderAck {
         HEADER_ACK_ACCEPT = 0;
         HEADER_ACK_REFUSE_NO_SIZE = 1;
         HEADER_ACK_REFUSE_NO_NAME = 2;
-        HEADER_ACK_REFUSE_OTHER = 3;
+        HEADER_ACK_REFUSE_NO_SHA3_512 = 3;
+        HEADER_ACK_REFUSE_OTHER = 4;
     }
     optional Reason reason = 3 [default = HEADER_ACK_REFUSE_OTHER];
 }

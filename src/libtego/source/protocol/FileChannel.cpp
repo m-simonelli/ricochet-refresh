@@ -116,6 +116,7 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
     if (direction() != Inbound) {
         qWarning() << "Rejected inbound message (FileHeader) on an outbound channel";
         response->set_accepted(false);
+        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_REFUSE_OTHER);
     } else if (!message.has_size() || !message.has_chunk_count()) {
         /* rationale:
          *  - if there's no size, we know when we've reached the end when cur_chunk == n_chunks
@@ -124,14 +125,18 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
         /* TODO: given ^, are both actually needed? */
         qWarning() << "Rejected file header with missing size";
         response->set_accepted(false);
-    } else if (!message.has_sha256()) {
-        qWarning() << "Rejected file header with missing hash (sha256) - cannot validate";
+        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_REFUSE_NO_SIZE);
+    } else if (!message.has_sha3_512()) {
+        qWarning() << "Rejected file header with missing hash (sha3_512) - cannot validate";
         response->set_accepted(false);
+        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_REFUSE_NO_SHA3_512);
     } else if (!message.has_file_id()) {
         qWarning() << "Rejected file header with missing id";
         response->set_accepted(false);
+        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_REFUSE_OTHER);
     } else {
         response->set_accepted(true);
+        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_ACCEPT);
         /* Use the file id as part of the directory name */
         /* TODO: windows */
         dirname  = "/tmp/ricochet-";
@@ -149,9 +154,13 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
 
         hdr_file.open(dirname/"hdr_file", std::ios::out | std::ios::binary);
         if (!hdr_file) {
+            qWarning() << "Could not open header file";
+            response->set_accepted(false);
+        } else {
+            /* FIXME: sha3_512 field could have a null byte, so use fstream::write */
             hdr_file << message.chunk_count()   // on each chunk, check that we haven't exceeded given chunk count
                      << message.size()          // after constructing final file, compare sizes
-                     << message.sha256();       // validate file after constructing from chunks
+                     << message.sha3_512();  // validate file after constructing from chunks
             if (message.has_name()) {
                 hdr_file << message.name().length()
                          << message.name();
@@ -159,9 +168,6 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
                 hdr_file << std::to_string(message.file_id()).length()
                          << std::to_string(message.file_id());
             }
-        } else {
-            qWarning() << "Could not open header file";
-            response->set_accepted(false);
         }
     }
 
@@ -200,12 +206,14 @@ bool FileChannel::sendFileWithId(QString file_url,
     std::fstream chunk;
     std::uintmax_t file_size;
     std::uintmax_t file_chunks;
-    std::uintmax_t cur_chunk;
-    std::uintmax_t chunk_name_sz;
     std::filesystem::path file_path;
     std::filesystem::path file_dir;
     std::string chunk_name;
-    char *file_chunk = new char[FileMaxDecodedChunkSize];
+    Data::File::FileHeader header;
+    char *buf;
+    EVP_MD_CTX *sha3_512_ctx;
+    unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
+    unsigned int sha3_512_value_len;
 
     if (direction() != Outbound) {
         BUG() << "Attempted to send outbound message on non outbound channel";
@@ -224,6 +232,7 @@ bool FileChannel::sendFileWithId(QString file_url,
         !std::filesystem::is_regular_file(file_path)) {
         file_path = std::filesystem::read_symlink(file_path);
         if (!std::filesystem::is_regular_file(file_path)) {
+            /* TODO: is there a good way to follow a symlink chain without ending up in a recursion loop? */
             qWarning() << "Rejected file url, reason: More than 1 level of symlink chaining";
             return false;
         }
@@ -235,49 +244,37 @@ bool FileChannel::sendFileWithId(QString file_url,
         qWarning() << "Rejected file url, reason: " << e.what();
         return false;
     }
+
     file_chunks = CEIL_DIV(file_size, 1500);
-
-    /* XXX: write to /tmp/ricochet/... instead of wherever the file is */
-    /* get parent path, make directory there called "chunks", chunk the file into
-     * 1500 byte blocks */
-    file_dir = file_path.parent_path();
-
-    try {
-        std::filesystem::create_directory(file_dir/"chunks");
-    } catch (std::filesystem::filesystem_error &e) {
-        qWarning() << "Could not create directory, reason: " << e.what();
+    
+    file.open(file_path, std::ios::in | std::ios::binary);
+    if (!file) {
+        qWarning() << "Failed to open file for sending";
         return false;
     }
 
-    file.open(file_path);
+    /* this amount of bytes is completly arbitrary, but keeping it rather low
+     * helps with not using too much memory */
+    buf = new char[65535];
 
-    /* XXX: should it be file_id-%d.part? */
-    /* chunk name is formatted as:
-     * filename-%d.part */
-    chunk_name_sz = file_path.filename().string().length() + 
-                      std::to_string(file_chunks).length() +
-                      strlen("-.part");
-    chunk_name.resize(chunk_name_sz);
-
-    for (cur_chunk = 0; cur_chunk < file_chunks; cur_chunk++) {
-#if __cplusplus < 201103L
-    /* NOTE: I'm not sure if anything else relies on newer versions of the C++ standard */
-    #error "The set C++ standard is too old, and will lead to undefined behaviour. Please use at least C++11"
-#endif
-        /* get the chunk name */
-        /* snprintf to &std::string[0] is valid as of c++11, pre c++11 this was UB */
-        snprintf(&chunk_name[0], chunk_name_sz, "%s-%0*ld.part", 
-                 file_path.filename().string().c_str(), 
-                 (int)std::to_string(file_chunks).length(), 
-                 cur_chunk);
-        file.read(file_chunk, FileMaxDecodedChunkSize);
-
-        /* write out the chunk */
-        chunk.open(file_path/"chunks"/chunk_name, std::ios::out | std::ios::binary);
-        chunk.write(file_chunk, FileMaxDecodedChunkSize);
-        chunk.close();
+    /* Review this */
+    sha3_512_ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
+    while (file.good()) {
+        file.read(buf, 65535);
+        EVP_DigestUpdate(sha3_512_ctx, buf, 65535);
     }
+    EVP_DigestFinal_ex(sha3_512_ctx, sha3_512_value, &sha3_512_value_len);
+    EVP_MD_CTX_free(sha3_512_ctx);
 
+    delete buf;
+
+    header.set_file_id(nextFileId());
+    header.set_size(file_size);
+    header.set_chunk_count(file_chunks);
+    header.set_sha3_512(sha3_512_value, sha3_512_value_len);
+
+    Channel::sendMessage(header);
     /* TODO: send the file - this requires channel/packet handling first */
     return false;
 }
