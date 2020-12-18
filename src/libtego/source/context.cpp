@@ -186,9 +186,6 @@ void tego_context::start_service(
     tego_user_type_t const* const* userTypeBuffer,
     size_t userCount)
 {
-    // TEGO_THROW_IF_FALSE((userCount > 0 && userBuffer != nullptr && userTypeBuffer != nullptr) ||
-                        // (userCount == 0 && userBuffer == nullptr && userTypeBuffer == nullptr));
-
     char rawKeyBlob[TEGO_ED25519_KEYBLOB_SIZE] = {0};
     tego_ed25519_keyblob_from_ed25519_private_key(
         rawKeyBlob,
@@ -208,6 +205,11 @@ void tego_context::start_service(
 
     // save off the singleton on our context
     this->identityManager = new IdentityManager(keyBlob, contactServiceIds);
+}
+
+void tego_context::start_service()
+{
+    this->identityManager = new IdentityManager({}, {});
 }
 
 int32_t tego_context::get_tor_bootstrap_progress() const
@@ -364,6 +366,40 @@ void tego_context::send_chat_request(
         (messageLength == 0) ? QString() : QString::fromUtf8(message, messageLength));
 }
 
+void tego_context::acknowledge_chat_request(
+        const tego_user_id_t* user,
+        tego_chat_acknowledge_t response)
+{
+    TEGO_THROW_IF_NULL(user);
+
+    logger::println("ack chat request from {}", user->serviceId.data);
+    logger::println("response : {}", (int)response);
+
+    TEGO_THROW_IF_NULL(this->identityManager);
+    auto userIdentity = this->identityManager->identities().first();
+    auto contactsManager = userIdentity->getContacts();
+    auto incomingRequestManager = contactsManager->incomingRequestManager();
+
+    auto hostname = QString("%1.onion").arg(user->serviceId.data).toUtf8();
+
+    auto incomingContactRequest = incomingRequestManager->requestFromHostname(hostname);
+    TEGO_THROW_IF_NULL(incomingContactRequest);
+
+    switch(response)
+    {
+        case tego_chat_acknowledge_accept:
+            incomingContactRequest->accept(nullptr);
+            break;
+        case tego_chat_acknowledge_reject:
+            incomingContactRequest->reject();
+            break;
+        case tego_chat_acknowledge_block:
+            incomingContactRequest->reject();
+            incomingRequestManager->addRejectedHost(hostname);
+            break;
+    }
+}
+
 tego_message_id_t tego_context::send_message(
     const tego_user_id_t* user,
     const std::string& message)
@@ -495,6 +531,14 @@ std::vector<tego_user_id_t*> tego_context::get_users() const
     return users;
 }
 
+void tego_context::forget_user(const tego_user_id_t* user)
+{
+    // TODO: does not handle our blocked users or incoming request users
+    auto contactUser = this->getContactUser(user);
+    TEGO_THROW_IF_NULL(contactUser);
+    contactUser->deleteContact();
+}
+
 //
 // tego_context private methods
 //
@@ -512,7 +556,6 @@ ContactUser* tego_context::getContactUser(tego_user_id_t const* user) const
 
     return contactUser;
 }
-
 
 //
 // Exports
@@ -740,12 +783,24 @@ extern "C"
         return tego::translateExceptions([=]() -> void
         {
             TEGO_THROW_IF_NULL(context);
-            context->start_service(
-                hostPrivateKey,
-                userBuffer,
-                userTypeBuffer,
-                userCount);
 
+            if (hostPrivateKey == nullptr)
+            {
+                TEGO_THROW_IF_FALSE(userBuffer == nullptr && userTypeBuffer == nullptr && userCount == 0);
+                context->start_service();
+            }
+            else
+            {
+                // TODO: bring back userTypeBuffer checks once we've implemented that
+                TEGO_THROW_IF_FALSE((userBuffer == nullptr /* && userTypeBuffer == nullptr*/ && userCount == 0) ||
+                                    (userBuffer != nullptr /* && userTypeBuffer != nullptr*/ && userCount > 0));
+
+                context->start_service(
+                    hostPrivateKey,
+                    userBuffer,
+                    userTypeBuffer,
+                    userCount);
+            }
         }, error);
     }
 
@@ -877,6 +932,20 @@ extern "C"
         }, error);
     }
 
+    void tego_context_acknowledge_chat_request(
+        tego_context_t* context,
+        const tego_user_id_t* user,
+        tego_chat_acknowledge_t response,
+        tego_error_t** error)
+    {
+        return tego::translateExceptions([=]() -> void
+        {
+            TEGO_THROW_IF_NULL(context);
+
+            context->acknowledge_chat_request(user, response);
+        }, error);
+    }
+
     void tego_context_send_message(
         tego_context_t* context,
         tego_user_id_t* user,
@@ -897,6 +966,18 @@ extern "C"
             {
                 *out_id = id;
             }
+        }, error);
+    }
+
+    void tego_context_forget_user(
+        tego_context_t* context,
+        const tego_user_id_t* user,
+        tego_error_t** error)
+    {
+        return tego::translateExceptions([=]() -> void
+        {
+            TEGO_THROW_IF_NULL(context);
+            context->forget_user(user);
         }, error);
     }
 }

@@ -49,7 +49,6 @@ class OutgoingContactRequest : public QObject
     Q_PROPERTY(Status status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString myNickname READ myNickname CONSTANT)
     Q_PROPERTY(QString message READ message CONSTANT)
-    Q_PROPERTY(QString rejectMessage READ rejectMessage NOTIFY rejected)
 
 public:
     enum Status
@@ -72,11 +71,10 @@ public:
     QString myNickname() const;
     QString message() const;
     Status status() const;
-    QString rejectMessage() const;
 
 public slots:
     void accept();
-    void reject(bool error = false, const QString &reason = QString());
+    void reject(bool error);
     void cancel();
 
     void sendRequest(const QSharedPointer<Protocol::Connection> &connection);
@@ -84,7 +82,7 @@ public slots:
 signals:
     void statusChanged(int newStatus, int oldStatus);
     void accepted();
-    void rejected(const QString &reason);
+    void rejected();
     void removed();
 
 private slots:

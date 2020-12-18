@@ -1,13 +1,10 @@
 #pragma once
 
-class ContactUser;
-class OutgoingContactRequest;
-class ConversationModel;
-
 namespace shims
 {
     class ContactsManager;
     class ConversationModel;
+    class OutgoingContactRequest;
     class ContactUser : public QObject
     {
         Q_OBJECT
@@ -17,11 +14,8 @@ namespace shims
         Q_PROPERTY(QString nickname READ getNickname WRITE setNickname NOTIFY nicknameChanged)
         Q_PROPERTY(QString contactID READ getContactID CONSTANT)
         Q_PROPERTY(Status status READ getStatus NOTIFY statusChanged)
-        Q_PROPERTY(OutgoingContactRequest *contactRequest READ contactRequest NOTIFY statusChanged)
-        Q_PROPERTY(shims::ConversationModel *conversation READ conversation CONSTANT)
-
-        friend class shims::ContactsManager;
-
+        Q_PROPERTY(shims::OutgoingContactRequest* contactRequest READ contactRequest NOTIFY statusChanged)
+        Q_PROPERTY(shims::ConversationModel* conversation READ conversation CONSTANT)
     public:
         enum Status
         {
@@ -32,13 +26,18 @@ namespace shims
             Outdated
         };
 
-        ContactUser(tego_context_t* context, ::ContactUser*);
+        ContactUser(const QString& serviceId, const QString& nickname);
 
         QString getNickname() const;
         QString getContactID() const;
         Status getStatus() const;
-        OutgoingContactRequest *contactRequest();
+        void setStatus(Status status);
+        shims::OutgoingContactRequest *contactRequest();
         shims::ConversationModel *conversation();
+
+        Q_INVOKABLE void deleteContact();
+
+        std::unique_ptr<tego_user_id_t> toTegoUserId() const;
 
     public slots:
         void setNickname(const QString &nickname);
@@ -49,12 +48,14 @@ namespace shims
         void contactDeleted(shims::ContactUser *user);
 
     private:
-        tego_context_t* context;
-        ::ContactUser* contactUser;
         shims::ConversationModel* conversationModel;
+        shims::OutgoingContactRequest* outgoingContactRequest;
 
+        Status status;
+        QString serviceId;
         QString nickname;
 
+        friend class shims::ContactsManager;
         friend class shims::ConversationModel;
     };
 }

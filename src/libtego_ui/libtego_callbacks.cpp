@@ -3,6 +3,8 @@
 #include "shims/TorManager.h"
 #include "shims/UserIdentity.h"
 #include "shims/ConversationModel.h"
+#include "shims/OutgoingContactRequest.h"
+
 namespace
 {
     constexpr int consumeInterval = 10;
@@ -49,8 +51,12 @@ namespace
         taskQueue.push_back(std::move(func));
     }
 
-    // converts the our tego_user_id_t to ricochet's contactId in the form ricochet:serviceidserviceidserviceid...
-    QString tegoUserIdToContactId(const tego_user_id_t* user)
+    QString serviceIdToContactId(const QString& serviceId)
+    {
+        return QStringLiteral("ricochet:%1").arg(serviceId);
+    }
+
+    QString tegoUserIdToServiceId(const tego_user_id_t* user)
     {
         std::unique_ptr<tego_v3_onion_service_id> serviceId;
         tego_user_id_get_v3_onion_service_id(user, tego::out(serviceId), tego::throw_on_error());
@@ -58,9 +64,14 @@ namespace
         char serviceIdRaw[TEGO_V3_ONION_SERVICE_ID_SIZE] = {0};
         tego_v3_onion_service_id_to_string(serviceId.get(), serviceIdRaw, sizeof(serviceIdRaw), tego::throw_on_error());
 
-        QString contactId = QString("ricochet:") + QString::fromUtf8(serviceIdRaw, TEGO_V3_ONION_SERVICE_ID_LENGTH);
-
+        auto contactId = QString::fromUtf8(serviceIdRaw, TEGO_V3_ONION_SERVICE_ID_LENGTH);
         return contactId;
+    }
+
+    // converts the our tego_user_id_t to ricochet's contactId in the form ricochet:serviceidserviceidserviceid...
+    QString tegoUserIdToContactId(const tego_user_id_t* user)
+    {
+        return serviceIdToContactId(tegoUserIdToServiceId(user));
     }
 
     shims::ContactUser* contactUserFromContactId(const QString& contactId)
@@ -223,25 +234,56 @@ namespace
         });
     }
 
+    void on_chat_request_received(
+        tego_context_t*,
+        const tego_user_id_t* userId,
+        const char* message,
+        size_t messageLength)
+    {
+        logger::println("Received chat request from {}", tegoUserIdToServiceId(userId));
+        logger::println("Message : {}", message);
+
+        auto hostname = tegoUserIdToServiceId(userId) + ".onion";
+        auto messageString = QString::fromUtf8(message, messageLength);
+
+        push_task([=]() -> void
+        {
+            auto userIdentity = shims::UserIdentity::userIdentity;
+            userIdentity->createIncomingContactRequest(hostname, messageString);
+        });
+    }
+
     void on_chat_request_response_received(
         tego_context_t*,
         const tego_user_id_t* userId,
         tego_bool_t requestAccepted)
     {
-        std::unique_ptr<tego_v3_onion_service_id> serviceId;
-        tego_user_id_get_v3_onion_service_id(userId, tego::out(serviceId), tego::throw_on_error());
+        logger::trace();
 
-        char serviceIdRaw[TEGO_V3_ONION_SERVICE_ID_SIZE] = {0};
-        tego_v3_onion_service_id_to_string(serviceId.get(), serviceIdRaw, sizeof(serviceIdRaw), tego::throw_on_error());
+        auto serviceId = tegoUserIdToServiceId(userId);
 
-        QString serviceIdString(serviceIdRaw);
         push_task([=]() -> void
         {
-            logger::trace();
-            if (requestAccepted) {
+            auto userIdentity = shims::UserIdentity::userIdentity;
+            auto contactsManager = userIdentity->getContacts();
+            auto contact = contactsManager->getShimContactByContactId(serviceIdToContactId(serviceId));
+            auto outgoingContactRequest = contact->contactRequest();
+
+            if (requestAccepted)
+            {
                 // delete the request block entirely like in OutgoingContactRequest::removeRequest
-                SettingsObject so(QStringLiteral("contacts.%1").arg(serviceIdString));
+                SettingsObject so(QStringLiteral("contacts.%1").arg(serviceId));
                 so.unset("request");
+
+                outgoingContactRequest->setAccepted();
+            }
+            else
+            {
+                SettingsObject so(QStringLiteral("contacts.%1").arg(serviceId));
+                so.write("request.status", 1);
+
+                outgoingContactRequest->setRejected();
+                contact->setStatus(shims::ContactUser::RequestRejected);
             }
         });
     }
@@ -252,23 +294,26 @@ namespace
         tego_user_status_t status)
     {
         logger::trace();
+        auto serviceId = tegoUserIdToServiceId(userId);
 
-        std::unique_ptr<tego_v3_onion_service_id> serviceId;
-        tego_user_id_get_v3_onion_service_id(userId, tego::out(serviceId), tego::throw_on_error());
+        logger::println("user status changed -> service id : {}, status : {}", serviceId, (int)status);
 
-        char serviceIdRaw[TEGO_V3_ONION_SERVICE_ID_SIZE] = {0};
-        tego_v3_onion_service_id_to_string(serviceId.get(), serviceIdRaw, sizeof(serviceIdRaw), tego::throw_on_error());
-
-        logger::println("user status changed -> service id : {}, status : {}", serviceIdRaw, (int)status);
-
-        QString serviceIdString(serviceIdRaw);
         push_task([=]() -> void
         {
-            constexpr auto ContactUser_RequestPending = 2;
-            if (status == ContactUser_RequestPending)
+            auto userIdentity = shims::UserIdentity::userIdentity;
+            auto contactsManager = userIdentity->getContacts();
+            auto contact = contactsManager->getShimContactByContactId(serviceIdToContactId(serviceId));
+
+            switch(status)
             {
-                SettingsObject so(QStringLiteral("contacts.%1").arg(serviceIdString));
-                so.write("request.status", 1);
+                case tego_user_status_online:
+                    contact->setStatus(shims::ContactUser::Online);
+                    break;
+                case tego_user_status_offline:
+                    contact->setStatus(shims::ContactUser::Offline);
+                    break;
+                default:
+                    break;
             }
         });
     }
@@ -386,6 +431,11 @@ void init_libtego_callbacks(tego_context_t* context)
     tego_context_set_host_user_state_changed_callback(
         context,
         &on_host_user_state_changed,
+        tego::throw_on_error());
+
+    tego_context_set_chat_request_received_callback(
+        context,
+        &on_chat_request_received,
         tego::throw_on_error());
 
     tego_context_set_chat_request_response_received_callback(

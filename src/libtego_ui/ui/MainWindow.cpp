@@ -31,10 +31,6 @@
  */
 
 #include "ui/MainWindow.h"
-#include "core/IncomingRequestManager.h"
-#include "core/OutgoingContactRequest.h"
-#include "core/ContactIDValidator.h"
-
 #include "ui/ContactsModel.h"
 #include "ui/LinkedText.h"
 #include "utils/Settings.h"
@@ -49,6 +45,9 @@
 #include "shims/ContactsManager.h"
 #include "shims/ContactUser.h"
 #include "shims/ConversationModel.h"
+#include "shims/OutgoingContactRequest.h"
+#include "shims/ContactIDValidator.h"
+#include "shims/IncomingContactRequest.h"
 
 MainWindow *uiMain = 0;
 
@@ -110,13 +109,12 @@ MainWindow::MainWindow(QObject *parent)
     qmlRegisterUncreatableType<shims::ContactUser>("im.ricochet", 1, 0, "ContactUser", QString());
     qmlRegisterUncreatableType<shims::UserIdentity>("im.ricochet", 1, 0, "UserIdentity", QString());
     qmlRegisterUncreatableType<shims::ContactsManager>("im.ricochet", 1, 0, "ContactsManager", QString());
-    qmlRegisterUncreatableType<::IncomingRequestManager>("im.ricochet", 1, 0, "IncomingRequestManager", QString());
-    qmlRegisterUncreatableType<::IncomingContactRequest>("im.ricochet", 1, 0, "IncomingContactRequest", QString());
-    qmlRegisterUncreatableType<::OutgoingContactRequest>("im.ricochet", 1, 0, "OutgoingContactRequest", QString());
+    qmlRegisterUncreatableType<shims::IncomingContactRequest>("im.ricochet", 1, 0, "IncomingContactRequest", QString());
+    qmlRegisterUncreatableType<shims::OutgoingContactRequest>("im.ricochet", 1, 0, "OutgoingContactRequest", QString());
     qmlRegisterUncreatableType<shims::TorControl>("im.ricochet", 1, 0, "TorControl", QString());
     qmlRegisterType<shims::ConversationModel>("im.ricochet", 1, 0, "ConversationModel");
     qmlRegisterType<::ContactsModel>("im.ricochet", 1, 0, "ContactsModel");
-    qmlRegisterType<::ContactIDValidator>("im.ricochet", 1, 0, "ContactIDValidator");
+    qmlRegisterType<shims::ContactIDValidator>("im.ricochet", 1, 0, "ContactIDValidator");
     qmlRegisterType<::SettingsObject>("im.ricochet", 1, 0, "Settings");
     qmlRegisterSingletonType<::LinkedText>("im.ricochet", 1, 0, "LinkedText", linkedtext_singleton);
     qmlRegisterType<::LanguagesModel>("im.ricochet", 1, 0, "LanguagesModel");
