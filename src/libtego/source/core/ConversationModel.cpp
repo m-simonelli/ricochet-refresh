@@ -110,19 +110,17 @@ template<typename T> T *channelForContact(ContactUser *contact, Protocol::Channe
 }
 
 tego_message_id_t ConversationModel::sendFile(const QString &file_url) {
-    MessageData message(file_url, QDateTime::currentDateTime(), 0, Queued);
+    MessageData message(file_url, QDateTime::currentDateTime(), lastMessageId++, Queued);
     message.type = ConversationModel::MessageData::Type::File;
 
     if (m_contact->connection()) {
         auto channel = channelForContact<Protocol::FileChannel>(m_contact);
 
         if (channel && channel->isOpened()) {
-            MessageId id = 0;
-            if (channel->sendFile(file_url, QDateTime(), id))
+            if (channel->sendFileWithId(file_url, QDateTime(), message.identifier))
                 message.status = Sending;
             else
                 message.status = Error;
-            message.identifier = id;
             message.attemptCount++;
         }
     }
