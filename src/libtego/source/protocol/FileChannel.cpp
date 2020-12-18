@@ -51,19 +51,39 @@ FileChannel::FileId FileChannel::nextFileId() {
     return ++file_id;
 }
 
-/* XXX: remove this once the below functions are implemented */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-bool FileChannel::allowInboundChannelRequest(const Data::Control::OpenChannel *request, Data::Control::ChannelResult *result)
+bool FileChannel::allowInboundChannelRequest(
+    __attribute__((unused)) const Data::Control::OpenChannel *request, 
+    Data::Control::ChannelResult *result)
 {
-    return false;
+    if (connection()->purpose() != Connection::Purpose::KnownContact) {
+        qDebug() << "Rejecting request for" << type() << "channel from connection with purpose" << int(connection()->purpose());
+        result->set_common_error(Data::Control::ChannelResult::UnauthorizedError);
+        return false;
+    }
+
+    if (connection()->findChannel<FileChannel>(Channel::Inbound)) {
+        qDebug() << "Rejecting request for" << type() << "channel because one is already open";
+        return false;
+    }
+
+    return true;
 }
 
-bool FileChannel::allowOutboundChannelRequest(Data::Control::OpenChannel *request)
+bool FileChannel::allowOutboundChannelRequest(
+    __attribute__((unused)) Data::Control::OpenChannel *request)
 {
-    return false;
+    if (connection()->findChannel<FileChannel>(Channel::Outbound)) {
+        BUG() << "Rejecting outbound request for" << type() << "channel because one is already open on this connection";
+        return false;
+    }
+
+    if (connection()->purpose() != Connection::Purpose::KnownContact) {
+        BUG() << "Rejecting outbound request for" << type() << "channel for connection with unexpected purpose" << int(connection()->purpose());
+        return false;
+    }
+
+    return true;
 }
-#pragma GCC diagnostic pop
 
 void FileChannel::receivePacket(const QByteArray &packet)
 {
@@ -89,19 +109,20 @@ void FileChannel::receivePacket(const QByteArray &packet)
 
 void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
     std::unique_ptr<Data::File::FileHeaderAck> response = std::make_unique<Data::File::FileHeaderAck>();
-    std::time_t time;
+    std::filesystem::path dirname;
+    std::fstream hdr_file;
     Data::File::Packet packet;
 
     if (direction() != Inbound) {
         qWarning() << "Rejected inbound message (FileHeader) on an outbound channel";
         response->set_accepted(false);
-    } else if (!message.has_size() && !message.has_chunk_count()) {
+    } else if (!message.has_size() || !message.has_chunk_count()) {
         /* rationale:
          *  - if there's no size, we know when we've reached the end when cur_chunk == n_chunks
          *  - if there's no chunk count, we know when we've reached the end when total_bytes >= size
          *  - if there's neither, size cannot be determined */
         /* TODO: given ^, are both actually needed? */
-        qWarning() << "Rejected file header with no way to determine size";
+        qWarning() << "Rejected file header with missing size";
         response->set_accepted(false);
     } else if (!message.has_sha256()) {
         qWarning() << "Rejected file header with missing hash (sha256) - cannot validate";
@@ -110,21 +131,46 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
         qWarning() << "Rejected file header with missing id";
         response->set_accepted(false);
     } else {
-        time = std::time(nullptr);
         response->set_accepted(true);
+        /* Use the file id as part of the directory name */
+        /* TODO: windows */
+        dirname  = "/tmp/ricochet-";
+        dirname += connection()->serverHostname().remove(".onion").toStdString();
+        dirname += "-";
+        dirname += std::to_string(message.file_id());
+
+        /* create directory to store chunks in /tmp */
+        try {
+            std::filesystem::create_directory(dirname);
+        } catch (std::filesystem::filesystem_error &e) {
+            qWarning() << "Could not create tmp directory, reason: " << e.what();
+            response->set_accepted(false);
+        }
+
+        hdr_file.open(dirname/"hdr_file", std::ios::out | std::ios::binary);
+        if (!hdr_file) {
+            hdr_file << message.chunk_count()   // on each chunk, check that we haven't exceeded given chunk count
+                     << message.size()          // after constructing final file, compare sizes
+                     << message.sha256();       // validate file after constructing from chunks
+            if (message.has_name()) {
+                hdr_file << message.name().length()
+                         << message.name();
+            } else {
+                hdr_file << std::to_string(message.file_id()).length()
+                         << std::to_string(message.file_id());
+            }
+        } else {
+            qWarning() << "Could not open header file";
+            response->set_accepted(false);
+        }
     }
 
-    /* Use the file id as name if none is given */
-    /* FIXME: this won't work since it's const, and there's probably a better
-     * way of going about this */
-    /*if (!message.has_name() && response->accepted()) {
-        message.set_name(std::to_string(message.file_id()));
-    }*/
-
-    /* send the response */
-    response->set_file_id(message.file_id());
-    packet.set_allocated_file_header_ack(std::move(response).get());
-    Channel::sendMessage(packet);
+    if (message.has_file_id()) {
+        /* send the response */
+        response->set_file_id(message.file_id());
+        packet.set_allocated_file_header_ack(std::move(response).get());
+        Channel::sendMessage(packet);
+    }
 }
 
 void FileChannel::handleFileChunk(__attribute__((unused)) const Data::File::FileChunk &message){

@@ -95,7 +95,6 @@ void ChatChannel::receivePacket(const QByteArray &packet)
     }
 }
 
-
 bool ChatChannel::sendChatMessageWithId(QString text, QDateTime time, MessageId id)
 {
     if (direction() != Outbound) {
