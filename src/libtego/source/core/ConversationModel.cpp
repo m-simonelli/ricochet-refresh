@@ -95,7 +95,7 @@ void ConversationModel::setContact(ContactUser *contact)
 
 /* Get a channel of type T for a contact, if it doesn't exist create one
  * on error returns NULL */
-template<typename T> T *channelForContact(ContactUser *contact, Protocol::Channel::Direction direction = Protocol::Channel::Outbound) {
+template<typename T> T *findOrCreateChannelForContact(ContactUser *contact, Protocol::Channel::Direction direction = Protocol::Channel::Outbound) {
     T *channel = contact->connection()->findChannel<T>(direction);
     if (!channel) {
         /* create a new channel */
@@ -114,7 +114,7 @@ tego_message_id_t ConversationModel::sendFile(const QString &file_url) {
     message.type = ConversationModel::MessageData::Type::File;
 
     if (m_contact->connection()) {
-        auto channel = channelForContact<Protocol::FileChannel>(m_contact);
+        auto channel = findOrCreateChannelForContact<Protocol::FileChannel>(m_contact);
 
         if (channel && channel->isOpened()) {
             if (channel->sendFileWithId(file_url, QDateTime(), message.identifier))
@@ -148,7 +148,7 @@ tego_message_id_t ConversationModel::sendMessage(const QString &text)
     MessageData message(text, QDateTime::currentDateTime(), lastMessageId++, Queued);
 
     if (m_contact->connection()) {
-        auto channel = channelForContact<Protocol::ChatChannel>(m_contact);
+        auto channel = findOrCreateChannelForContact<Protocol::ChatChannel>(m_contact);
 
         if (channel && channel->isOpened()) {
             if (channel->sendChatMessageWithId(text, QDateTime(), message.identifier))
@@ -184,8 +184,8 @@ void ConversationModel::sendQueuedMessages()
     if (!haveQueued)
         return;
 
-    auto chat_channel = channelForContact<Protocol::ChatChannel>(m_contact);
-    auto file_channel = channelForContact<Protocol::FileChannel>(m_contact);
+    auto chat_channel = findOrCreateChannelForContact<Protocol::ChatChannel>(m_contact);
+    auto file_channel = findOrCreateChannelForContact<Protocol::FileChannel>(m_contact);
 
     // sendQueuedMessages is called at channelOpened
     if (!chat_channel->isOpened())
