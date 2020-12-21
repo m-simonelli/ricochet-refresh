@@ -201,7 +201,7 @@ bool FileChannel::sendFile(QString file_url, QDateTime time, FileId &id) {
 
 bool FileChannel::sendFileWithId(QString file_url, 
                                  __attribute__((unused)) QDateTime time, 
-                                 __attribute__((unused)) FileId &id) {
+                                 FileId &id) {
     std::fstream file;
     std::fstream chunk;
     std::uintmax_t file_size;
@@ -225,6 +225,9 @@ bool FileChannel::sendFileWithId(QString file_url,
         return false;
     }
 
+    /* sendNextChunk will resume a transfer if connection was interrupted */
+    if (sendNextChunk(id)) return true;
+
     file_path = file_url.toStdString();
 
     /* only allow regular files or symlinks to regular files (no symlink chaining) */
@@ -245,11 +248,11 @@ bool FileChannel::sendFileWithId(QString file_url,
         return false;
     }
 
-    file_chunks = CEIL_DIV(file_size, 1500);
+    file_chunks = CEIL_DIV(file_size, FileMaxChunkSize);
     
     file.open(file_path, std::ios::in | std::ios::binary);
     if (!file) {
-        qWarning() << "Failed to open file for sending";
+        qWarning() << "Failed to open file for sending header";
         return false;
     }
 
@@ -275,6 +278,60 @@ bool FileChannel::sendFileWithId(QString file_url,
     header.set_sha3_512(sha3_512_value, sha3_512_value_len);
 
     Channel::sendMessage(header);
-    /* TODO: send the file - this requires channel/packet handling first */
-    return false;
+    
+    /* the first chunk will get sent after the first header ack */
+    return true;
+}
+
+bool FileChannel::sendNextChunk(FileId id) {
+    //TODO: check either file digest or file last modified time, if they don't match before, start from chunk 0
+    std::fstream file;
+    Data::File::FileChunk chunk;
+    char *buf;
+    EVP_MD_CTX *sha3_512_ctx;
+    unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
+    unsigned int sha3_512_value_len;
+
+    auto exisiting_queued_file =
+        std::find_if(queuedFiles.begin(), 
+        queuedFiles.end(), 
+        [id](const queuedFile &qf) { return qf.id == id; });
+
+    if (exisiting_queued_file == queuedFiles.end())
+        return false;
+
+    file.open(exisiting_queued_file->path, std::ios::in | std::ios::binary);
+    if (!file) {
+        qWarning() << "Failed to open file for sending chunk";
+        return false;
+    }
+
+    /* go to the pos of the next chunk */
+    file.seekg(FileMaxChunkSize * exisiting_queued_file->last_chunk);
+    if (!file) {
+        qWarning() << "Failed to seek to last position in file for chunking";
+        return false;
+    }
+
+    buf = new char[FileMaxChunkSize]();
+
+    file.read(buf, FileMaxChunkSize);
+
+    /* hash this chunk */
+    sha3_512_ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
+    EVP_DigestUpdate(sha3_512_ctx, buf, FileMaxChunkSize);
+    EVP_DigestFinal_ex(sha3_512_ctx, sha3_512_value, &sha3_512_value_len);
+    EVP_MD_CTX_free(sha3_512_ctx);
+
+    /* send this chunk */
+    exisiting_queued_file->last_chunk++;
+    chunk.set_sha3_512(sha3_512_value, sha3_512_value_len);
+    chunk.set_file_id(id);
+    chunk.set_chunk_id(exisiting_queued_file->last_chunk);
+    chunk.set_chunk_size(FileMaxChunkSize);
+    chunk.set_chunk_data(buf, FileMaxChunkSize);
+
+    Channel::sendMessage(chunk);
+    return true;
 }
