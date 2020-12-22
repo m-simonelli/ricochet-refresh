@@ -157,10 +157,13 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
             qWarning() << "Could not open header file";
             response->set_accepted(false);
         } else {
-            /* FIXME: sha3_512 field could have a null byte, so use fstream::write */
-            hdr_file << message.chunk_count()   // on each chunk, check that we haven't exceeded given chunk count
-                     << message.size()          // after constructing final file, compare sizes
-                     << message.sha3_512();  // validate file after constructing from chunks
+            auto size = message.size();
+            auto chunk_count = message.chunk_count();
+            auto sha3_512 = message.sha3_512();
+            hdr_file.write(reinterpret_cast<const char *>(&chunk_count), sizeof(chunk_count))
+                    .write(reinterpret_cast<const char *>(&size), sizeof(size))
+                    .write(reinterpret_cast<const char *>(sha3_512.c_str()), sha3_512.size());
+
             if (message.has_name()) {
                 hdr_file << message.name().length()
                          << message.name();
