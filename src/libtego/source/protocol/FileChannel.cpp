@@ -194,14 +194,9 @@ void FileChannel::handleFileHeaderAck(__attribute__((unused)) const Data::File::
     TEGO_THROW_IF_FALSE(false);
 }
 
-bool FileChannel::sendFile(QString file_url, QDateTime time, FileId &id) {
-    id = nextFileId();
-    return sendFileWithId(file_url, time, id);
-}
-
 bool FileChannel::sendFileWithId(QString file_url, 
                                  __attribute__((unused)) QDateTime time, 
-                                 FileId &id) {
+                                 FileId id) {
     std::fstream file;
     std::fstream chunk;
     std::uintmax_t file_size;
@@ -285,6 +280,30 @@ bool FileChannel::sendFileWithId(QString file_url,
 
 bool FileChannel::sendNextChunk(FileId id) {
     //TODO: check either file digest or file last modified time, if they don't match before, start from chunk 0
+    auto it =
+        std::find_if(queuedFiles.begin(), 
+        queuedFiles.end(), 
+        [id](const queuedFile &qf) { return qf.id == id; });
+
+    if (it == queuedFiles.end())
+        return false;
+
+    return sendChunkWithId(id, it->path, it->last_chunk++);
+}
+
+bool FileChannel::sendChunkWithId(FileId fid, ChunkId cid) {
+    auto it = 
+        std::find_if(queuedFiles.begin(),
+        queuedFiles.end(),
+        [fid](const queuedFile &qf) {return qf.id == fid; });
+
+    if (it == queuedFiles.end())
+        return false;
+
+    return sendChunkWithId(fid, it->path, cid);
+}
+
+bool FileChannel::sendChunkWithId(FileId fid, std::filesystem::path &fpath, ChunkId cid) {
     std::fstream file;
     Data::File::FileChunk chunk;
     char *buf;
@@ -292,29 +311,27 @@ bool FileChannel::sendNextChunk(FileId id) {
     unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
     unsigned int sha3_512_value_len;
 
-    auto exisiting_queued_file =
-        std::find_if(queuedFiles.begin(), 
-        queuedFiles.end(), 
-        [id](const queuedFile &qf) { return qf.id == id; });
 
-    if (exisiting_queued_file == queuedFiles.end())
-        return false;
-
-    file.open(exisiting_queued_file->path, std::ios::in | std::ios::binary);
+    file.open(fpath, std::ios::in | std::ios::binary);
     if (!file) {
         qWarning() << "Failed to open file for sending chunk";
         return false;
     }
 
-    /* go to the pos of the next chunk */
-    file.seekg(FileMaxChunkSize * exisiting_queued_file->last_chunk);
+    if (FileMaxChunkSize * cid > std::filesystem::file_size(fpath)) {
+        qWarning() << "Attempted to read chunk beyond EOF";
+        return false;
+    }
+    
+    /* go to the pos of the chunk */
+    file.seekg(FileMaxChunkSize * cid);
     if (!file) {
         qWarning() << "Failed to seek to last position in file for chunking";
         return false;
     }
 
     buf = new char[FileMaxChunkSize]();
-
+    
     file.read(buf, FileMaxChunkSize);
 
     /* hash this chunk */
@@ -325,12 +342,14 @@ bool FileChannel::sendNextChunk(FileId id) {
     EVP_MD_CTX_free(sha3_512_ctx);
 
     /* send this chunk */
-    exisiting_queued_file->last_chunk++;
     chunk.set_sha3_512(sha3_512_value, sha3_512_value_len);
-    chunk.set_file_id(id);
-    chunk.set_chunk_id(exisiting_queued_file->last_chunk);
+    chunk.set_file_id(fid);
+    chunk.set_chunk_id(cid);
     chunk.set_chunk_size(FileMaxChunkSize);
     chunk.set_chunk_data(buf, FileMaxChunkSize);
+    //TODO chunk.set_time_delta();
+
+    delete[] buf;
 
     Channel::sendMessage(chunk);
     return true;

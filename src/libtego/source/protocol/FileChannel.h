@@ -46,13 +46,15 @@ class FileChannel : public Channel
 
 public:
     typedef quint32 FileId;
+    typedef quint32 ChunkId;
     static const int FileMaxChunkSize = 2000;
 
     explicit FileChannel(Direction direction, Connection *connection);
 
-    bool sendFile(QString file_url, QDateTime time, FileId &id);
-    bool sendFileWithId(QString file_url, QDateTime time, FileId &id);
+    bool sendFileWithId(QString file_url, QDateTime time, FileId id);
     bool sendNextChunk(FileId id);
+    bool sendChunkWithId(FileId fid, ChunkId cid);
+    bool sendChunkWithId(FileId fid, std::filesystem::path &fpath, ChunkId cid);
 
 signals:
 protected:
@@ -67,7 +69,7 @@ private:
         FileId id;
         std::filesystem::path path;
         size_t size;
-        size_t last_chunk;
+        ChunkId last_chunk;
         bool peer_did_accept;
     };
     std::vector<queuedFile> queuedFiles;
