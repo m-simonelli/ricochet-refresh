@@ -184,9 +184,39 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
     }
 }
 
-void FileChannel::handleFileChunk(__attribute__((unused)) const Data::File::FileChunk &message){
-    /* not implemented yet, this should never be called as of now */
-    TEGO_THROW_IF_FALSE(false);
+void FileChannel::handleFileChunk(const Data::File::FileChunk &message){
+    EVP_MD_CTX *sha3_512_ctx;
+    unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
+    unsigned int sha3_512_value_len;
+
+    std::filesystem::path fpath;
+    std::ofstream chunk_file;
+
+    auto it =
+        std::find_if(pendingRecvFiles.begin(),
+        pendingRecvFiles.end(),
+        [message](const pendingRecvFile &prf) { return prf.id == message.file_id(); });
+
+    if (it == pendingRecvFiles.end())
+        return;
+
+    if (message.chunk_size() > FileMaxChunkSize || message.chunk_size() != message.chunk_data().length())
+        return; /* either chunk too large or the size given was invalid */
+
+    sha3_512_ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
+    EVP_DigestUpdate(sha3_512_ctx, message.chunk_data().c_str(), message.chunk_size());
+    EVP_DigestFinal_ex(sha3_512_ctx, sha3_512_value, &sha3_512_value_len);
+    EVP_MD_CTX_free(sha3_512_ctx);
+
+    if (strncmp(reinterpret_cast<const char*>(sha3_512_value), message.sha3_512().c_str(), sha3_512_value_len) != 0)
+        return; /* sha3_512 mismatch */
+
+    fpath = it->path / std::to_string(message.chunk_id());
+    /* open (and clear contents if they exist) */
+    chunk_file.open(fpath, std::ios::out | std::ios::binary | std::ios::trunc);
+    chunk_file.write(message.chunk_data().c_str(), message.chunk_size());
+    chunk_file.close();
 }
 
 void FileChannel::handleFileChunkAck(__attribute__((unused)) const Data::File::FileChunkAck &message){
@@ -219,7 +249,7 @@ void FileChannel::handleFileHeaderAck(const Data::File::FileHeaderAck &message){
 
     pendingFileHeaders.erase(pendingFileHeaders.begin() + index);
 
-    //todo: message_acknowledged signal/callback needs to go here
+    //todo: message_acknowledged signal/callback needs to go here, before the call to sendChunkWithId
 
     /* start the transfer at chunk 0 */
     if (message.accepted()) {
@@ -230,8 +260,7 @@ void FileChannel::handleFileHeaderAck(const Data::File::FileHeaderAck &message){
 bool FileChannel::sendFileWithId(QString file_url,
                                  __attribute__((unused)) QDateTime time,
                                  FileId id) {
-    std::fstream file;
-    std::fstream chunk;
+    std::ifstream file;
     std::uintmax_t file_chunks;
     std::filesystem::path file_path;
     std::filesystem::path file_dir;
@@ -358,7 +387,7 @@ bool FileChannel::sendChunkWithId(FileId fid, ChunkId cid) {
 }
 
 bool FileChannel::sendChunkWithId(FileId fid, std::filesystem::path &fpath, ChunkId cid) {
-    std::fstream file;
+    std::ifstream file;
     Data::File::FileChunk chunk;
     char *buf;
     std::streamsize bytes_read;
@@ -399,6 +428,7 @@ bool FileChannel::sendChunkWithId(FileId fid, std::filesystem::path &fpath, Chun
     TEGO_THROW_IF_TRUE_MSG(bytes_read > 65535, "Invalid amount of bytes read");
     
     /* hash this chunk */
+    /* review this */
     sha3_512_ctx = EVP_MD_CTX_new();
     EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
     EVP_DigestUpdate(sha3_512_ctx, buf, bytes_read);
