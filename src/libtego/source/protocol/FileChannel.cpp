@@ -98,7 +98,7 @@ void FileChannel::receivePacket(const QByteArray &packet)
     } else if (message.has_file_chunk()) {
         handleFileChunk(message.file_chunk());
     } else if (message.has_file_chunk_ack()) {
-        handleFileAck(message.file_chunk_ack());
+        handleFileChunkAck(message.file_chunk_ack());
     } else if (message.has_file_header_ack()) {
         handleFileHeaderAck(message.file_header_ack());    
     } else {
