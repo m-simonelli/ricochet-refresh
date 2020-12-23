@@ -112,6 +112,7 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
     std::filesystem::path dirname;
     std::fstream hdr_file;
     Data::File::Packet packet;
+    pendingRecvFile prf;
 
     if (direction() != Inbound) {
         qWarning() << "Rejected inbound message (FileHeader) on an outbound channel";
@@ -166,6 +167,12 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
                 hdr_file << std::to_string(message.file_id()).length()
                          << std::to_string(message.file_id());
             }
+
+            prf.id = message.file_id();
+            prf.path = dirname;
+            prf.size = size;
+            prf.last_chunk = 0;
+            pendingRecvFiles.push_back(prf);
         }
     }
 

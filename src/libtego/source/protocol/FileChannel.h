@@ -72,8 +72,17 @@ private:
         ChunkId last_chunk;
         bool peer_did_accept;
     };
-    std::vector<queuedFile> queuedFiles;    //files that have already been queued to be sent and the destination has replied accepting the transfer
-    std::vector<queuedFile> pendingFileHeaders; //file headers that are waiting for an ack
+
+    struct pendingRecvFile {
+        FileId id;
+        std::filesystem::path path;
+        size_t size;
+        ChunkId last_chunk;
+    };
+
+    std::vector<queuedFile> queuedFiles;            //files that have already been queued to be sent and the destination has replied accepting the transfer
+    std::vector<queuedFile> pendingFileHeaders;     //file headers that are waiting for an ack
+    std::vector<pendingRecvFile> pendingRecvFiles;  //files that we have accepted to recieve, and are waiting on chunks
 
     void handleFileHeader(const Data::File::FileHeader &message);
     void handleFileChunk(const Data::File::FileChunk &message);
