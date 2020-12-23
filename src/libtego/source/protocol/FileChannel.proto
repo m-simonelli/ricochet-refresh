@@ -37,7 +37,7 @@ package Protocol.Data.File;
 message Packet {
     optional FileHeader file_header = 1;
     optional FileChunk file_chunk = 2;
-    optional FileChunkAck file_ack = 3;
+    optional FileChunkAck file_chunk_ack = 3;
     optional FileHeaderAck file_header_ack = 4;
 }
 
@@ -65,30 +65,9 @@ message FileChunk {
 message FileChunkAck {
     optional uint64 file_chunk_id = 1;
     optional bool accepted = 2 [default = false];
-    enum Reason {
-        CHUNK_ACK_ACCEPT = 0;
-        /* the sender should resend the header */
-        CHUNK_ACK_REFUSE_NO_MATCHING_FILE_HDR = 1;
-        /* the sender should resend the chunk (and possibly recheck the sha3_512) */
-        CHUNK_ACK_REFUSE_SHA3_512 = 2;
-        /* the sender should shrink the chunk */
-        CHUNK_ACK_REFUSE_OVER_SIZE = 3;
-        /* the sender should resend the chunk */
-        CHUNK_ACK_REFUSE_OTHER = 4;
-    }
-    /* explicitly set the chunk to be accepted */
-    optional Reason reason = 3 [default = CHUNK_ACK_REFUSE_OTHER];
 }
 
 message FileHeaderAck {
     optional uint64 file_id = 1;
     optional bool accepted = 2 [default = false];
-    enum Reason {
-        HEADER_ACK_ACCEPT = 0;
-        HEADER_ACK_REFUSE_NO_SIZE = 1;
-        HEADER_ACK_REFUSE_NO_NAME = 2;
-        HEADER_ACK_REFUSE_NO_SHA3_512 = 3;
-        HEADER_ACK_REFUSE_OTHER = 4;
-    }
-    optional Reason reason = 3 [default = HEADER_ACK_REFUSE_OTHER];
 }

@@ -30,7 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "protocol/FileChannel.h"
+#include "FileChannel.h"
 #include "Channel_p.h"
 #include "Connection.h"
 #include "utils/SecureRNG.h"
@@ -97,8 +97,8 @@ void FileChannel::receivePacket(const QByteArray &packet)
         handleFileHeader(message.file_header());
     } else if (message.has_file_chunk()) {
         handleFileChunk(message.file_chunk());
-    } else if (message.has_file_ack()) {
-        handleFileAck(message.file_ack());
+    } else if (message.has_file_chunk_ack()) {
+        handleFileAck(message.file_chunk_ack());
     } else if (message.has_file_header_ack()) {
         handleFileHeaderAck(message.file_header_ack());    
     } else {
@@ -116,7 +116,6 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
     if (direction() != Inbound) {
         qWarning() << "Rejected inbound message (FileHeader) on an outbound channel";
         response->set_accepted(false);
-        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_REFUSE_OTHER);
     } else if (!message.has_size() || !message.has_chunk_count()) {
         /* rationale:
          *  - if there's no size, we know when we've reached the end when cur_chunk == n_chunks
@@ -125,18 +124,14 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
         /* TODO: given ^, are both actually needed? */
         qWarning() << "Rejected file header with missing size";
         response->set_accepted(false);
-        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_REFUSE_NO_SIZE);
     } else if (!message.has_sha3_512()) {
         qWarning() << "Rejected file header with missing hash (sha3_512) - cannot validate";
         response->set_accepted(false);
-        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_REFUSE_NO_SHA3_512);
     } else if (!message.has_file_id()) {
         qWarning() << "Rejected file header with missing id";
         response->set_accepted(false);
-        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_REFUSE_OTHER);
     } else {
         response->set_accepted(true);
-        response->set_reason(Data::File::FileHeaderAck_Reason::FileHeaderAck_Reason_HEADER_ACK_ACCEPT);
         /* Use the file id as part of the directory name */
         /* TODO: windows */
         dirname  = "/tmp/ricochet-";
@@ -187,29 +182,62 @@ void FileChannel::handleFileChunk(__attribute__((unused)) const Data::File::File
     TEGO_THROW_IF_FALSE(false);
 }
 
-void FileChannel::handleFileAck(__attribute__((unused)) const Data::File::FileChunkAck &message){
+void FileChannel::handleFileChunkAck(__attribute__((unused)) const Data::File::FileChunkAck &message){
     /* not implemented yet, this should never be called as of now */
     TEGO_THROW_IF_FALSE(false);
 }
 
-void FileChannel::handleFileHeaderAck(__attribute__((unused)) const Data::File::FileHeaderAck &message){
-    /* not implemented yet, this should never be called as of now */
-    TEGO_THROW_IF_FALSE(false);
+void FileChannel::handleFileHeaderAck(const Data::File::FileHeaderAck &message){
+    if (direction() != Inbound) {
+        qWarning() << "Rejected inbound message on outbound file channel";
+        return;
+    }
+
+    auto it =
+        std::find_if(pendingFileHeaders.begin(), 
+        pendingFileHeaders.end(), 
+        [message](const queuedFile &qf) { return qf.id == message.file_id(); });
+
+    if (it == pendingFileHeaders.end()) {
+        qWarning() << "recieved ack for a file header we never sent";
+        return;
+    }
+
+    auto index = std::distance(pendingFileHeaders.begin(), it);
+
+    if (message.accepted()) {
+        queuedFiles.insert(queuedFiles.end(), std::make_move_iterator(pendingFileHeaders.begin() + index),
+                                              std::make_move_iterator(pendingFileHeaders.end()));
+    }
+
+    pendingFileHeaders.erase(pendingFileHeaders.begin() + index);
+
+    //todo: message_acknowledged signal/callback needs to go here
+
+    /* start the transfer at chunk 0 */
+    if (message.accepted()) {
+        sendChunkWithId(it->id, it->path, 0);
+    }
 }
 
-bool FileChannel::sendFileWithId(QString file_url, 
-                                 __attribute__((unused)) QDateTime time, 
+bool FileChannel::sendFileWithId(QString file_url,
+                                 __attribute__((unused)) QDateTime time,
                                  FileId id) {
     std::fstream file;
     std::fstream chunk;
-    std::uintmax_t file_size;
     std::uintmax_t file_chunks;
     std::filesystem::path file_path;
     std::filesystem::path file_dir;
     std::string chunk_name;
+    uint64_t file_size;
+
+    FileId file_id;
+    queuedFile qf;
     Data::File::FileHeader header;
+
     char *buf;
     std::streamsize bytes_read;
+    
     EVP_MD_CTX *sha3_512_ctx;
     unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
     unsigned int sha3_512_value_len;
@@ -277,7 +305,16 @@ bool FileChannel::sendFileWithId(QString file_url,
     delete[] buf;
     file.close();
 
-    header.set_file_id(nextFileId());
+    file_id = nextFileId();
+    qf.id = file_id;
+    qf.path = file_path;
+    qf.last_chunk = 0;
+    qf.peer_did_accept = false;
+    qf.size = file_size;
+
+    pendingFileHeaders.push_back(qf);
+
+    header.set_file_id(file_id);
     header.set_size(file_size);
     header.set_chunk_count(file_chunks);
     header.set_sha3_512(sha3_512_value, sha3_512_value_len);
@@ -322,6 +359,10 @@ bool FileChannel::sendChunkWithId(FileId fid, std::filesystem::path &fpath, Chun
     unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
     unsigned int sha3_512_value_len;
 
+    if (direction() != Outbound) {
+        BUG() << "Attempted to send outbound message on non outbound channel";
+        return false;
+    }
 
     file.open(fpath, std::ios::in | std::ios::binary);
     if (!file) {
