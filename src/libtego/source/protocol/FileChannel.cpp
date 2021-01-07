@@ -171,7 +171,7 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
             prf.id = message.file_id();
             prf.path = dirname;
             prf.size = size;
-            prf.last_chunk = 0;
+            prf.cur_chunk = 0;
             pendingRecvFiles.push_back(prf);
         }
     }
@@ -219,9 +219,30 @@ void FileChannel::handleFileChunk(const Data::File::FileChunk &message){
     chunk_file.close();
 }
 
-void FileChannel::handleFileChunkAck(__attribute__((unused)) const Data::File::FileChunkAck &message){
-    /* not implemented yet, this should never be called as of now */
-    TEGO_THROW_IF_FALSE(false);
+void FileChannel::handleFileChunkAck(const Data::File::FileChunkAck &message){
+    auto it =
+        std::find_if(queuedFiles.begin(),
+        queuedFiles.end(),
+        [message](const queuedFile &qf) { return qf.cur_chunk == message.file_chunk_id(); });
+
+    if (it == queuedFiles.end()) {
+        qWarning() << "recieved ack for a chunk we never sent";
+        return;
+    }
+
+    if (it->cur_chunk * FileMaxChunkSize > std::filesystem::file_size(it->path)) {
+        it->finished = true;
+    }
+
+    if (it->finished) {
+        auto index = std::distance(queuedFiles.begin(), it);
+        queuedFiles.erase(queuedFiles.begin() + index);
+        return;
+    }
+
+    //todo: don't infinitely resend a chunk if it infinitely gets declined
+    if (message.accepted()) it->cur_chunk++;
+    sendChunkWithId(it->id, it->path, it->cur_chunk);
 }
 
 void FileChannel::handleFileHeaderAck(const Data::File::FileHeaderAck &message){
@@ -344,7 +365,7 @@ bool FileChannel::sendFileWithId(QString file_url,
     file_id = nextFileId();
     qf.id = file_id;
     qf.path = file_path;
-    qf.last_chunk = 0;
+    qf.cur_chunk = 0;
     qf.peer_did_accept = false;
     qf.size = file_size;
 
@@ -368,22 +389,11 @@ bool FileChannel::sendNextChunk(FileId id) {
         queuedFiles.end(), 
         [id](const queuedFile &qf) { return qf.id == id; });
 
-    if (it == queuedFiles.end())
-        return false;
+    if (it == queuedFiles.end()) return false;
+    if (it->cur_chunk * FileMaxChunkSize > std::filesystem::file_size(it->path)) it->finished = true;
+    if (it->finished) return false;
 
-    return sendChunkWithId(id, it->path, it->last_chunk++);
-}
-
-bool FileChannel::sendChunkWithId(FileId fid, ChunkId cid) {
-    auto it = 
-        std::find_if(queuedFiles.begin(),
-        queuedFiles.end(),
-        [fid](const queuedFile &qf) {return qf.id == fid; });
-
-    if (it == queuedFiles.end())
-        return false;
-
-    return sendChunkWithId(fid, it->path, cid);
+    return sendChunkWithId(id, it->path, it->cur_chunk++);
 }
 
 bool FileChannel::sendChunkWithId(FileId fid, std::filesystem::path &fpath, ChunkId cid) {
@@ -406,9 +416,8 @@ bool FileChannel::sendChunkWithId(FileId fid, std::filesystem::path &fpath, Chun
         return false;
     }
 
-    if (FileMaxChunkSize * cid > std::filesystem::file_size(fpath)) {
-        qWarning() << "Attempted to read chunk beyond EOF";
-        return false;
+    if (FileMaxChunkSize * (cid + 1) > std::filesystem::file_size(fpath)) {
+        qWarning() << "Attempted to start read beyond eof";
     }
     
     /* go to the pos of the chunk */
