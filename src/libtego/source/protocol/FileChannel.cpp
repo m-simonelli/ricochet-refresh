@@ -35,7 +35,6 @@
 #include "Connection.h"
 #include "utils/SecureRNG.h"
 #include "utils/Useful.h"
-#include "precomp.h"
 #include "context.hpp"
 #include "error.hpp"
 #include "globals.hpp"

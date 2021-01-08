@@ -1,6 +1,3 @@
-#ifndef _libtego_source_precomp_h
-#define _libtego_source_precomp_h
-
 #include <QtGlobal>
 
 // C headers
@@ -140,5 +137,3 @@ namespace tego
 }
 
 #endif //__cplusplus#i
-
-#endif // _libtego_source_precomp_h
