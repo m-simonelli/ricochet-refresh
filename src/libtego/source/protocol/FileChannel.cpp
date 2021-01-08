@@ -314,15 +314,12 @@ bool FileChannel::sendFileWithId(QString file_url,
 
     file_path = file_url.toStdString();
 
-    /* only allow regular files or symlinks to regular files (no symlink chaining) */
-    if (!std::filesystem::exists(file_path) || 
-        !std::filesystem::is_regular_file(file_path)) {
-        file_path = std::filesystem::read_symlink(file_path);
-        if (!std::filesystem::is_regular_file(file_path)) {
-            /* TODO: is there a good way to follow a symlink chain without ending up in a recursion loop? */
-            qWarning() << "Rejected file url, reason: More than 1 level of symlink chaining";
-            return false;
-        }
+    /* only allow regular files or symlinks chains to regular files */
+    try {
+        file_path = std::filesystem::canonical(file_path);
+    } catch (std::filesystem::filesystem_error &e) {
+        qWarning() << "Could not resolve symlink path/file path, reason: " << e.what();
+        return false;
     }
 
     try {
