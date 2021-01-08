@@ -46,8 +46,13 @@ FileChannel::FileChannel(Direction direction, Connection *connection)
 {
 }
 
-FileChannel::FileId FileChannel::nextFileId() {
+//unused
+FileChannel::file_id_t FileChannel::nextFileId() {
     return ++file_id;
+}
+
+size_t FileChannel::fsize_to_chunks(size_t sz) {
+    return (sz + (FileMaxChunkSize - 1)) / FileMaxChunkSize;
 }
 
 bool FileChannel::allowInboundChannelRequest(
@@ -279,7 +284,7 @@ void FileChannel::handleFileHeaderAck(const Data::File::FileHeaderAck &message){
 
 bool FileChannel::sendFileWithId(QString file_uri,
                                  QDateTime,
-                                 FileId id) {
+                                 file_id_t id) {
     std::ifstream file;
     std::uintmax_t file_chunks;
     std::filesystem::path file_path;
@@ -287,7 +292,7 @@ bool FileChannel::sendFileWithId(QString file_uri,
     std::string chunk_name;
     uint64_t file_size;
 
-    FileId file_id;
+    file_id_t file_id;
     queuedFile qf;
     Data::File::FileHeader header;
 
@@ -328,7 +333,7 @@ bool FileChannel::sendFileWithId(QString file_uri,
         return false;
     }
 
-    file_chunks = CEIL_DIV(file_size, FileMaxChunkSize);
+    file_chunks = fsize_to_chunks(file_size);
     
     file.open(file_path, std::ios::in | std::ios::binary);
     if (!file) {
@@ -338,18 +343,18 @@ bool FileChannel::sendFileWithId(QString file_uri,
 
     /* this amount of bytes is completly arbitrary, but keeping it rather low
      * helps with not using too much memory */
-    buf = new char[65535]();
+    buf = new char[SHA3_512_BUFSIZE]();
 
     /* Review this */
     sha3_512_ctx = EVP_MD_CTX_new();
     EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
     while (file.good()) {
-        file.read(buf, 65535);
+        file.read(buf, SHA3_512_BUFSIZE);
         bytes_read = file.gcount();
-        /* the only time bytes_read would be >65535 is if gcount thinks the
+        /* the only time bytes_read would be >SHA3_512_BUFSIZE is if gcount thinks the
          * amount of bytes read is unrepresentable, in which case something has
          * gone wrong */
-        TEGO_THROW_IF_TRUE_MSG(bytes_read > 65535, "Invalid amount of bytes read");
+        TEGO_THROW_IF_TRUE_MSG(bytes_read > SHA3_512_BUFSIZE, "Invalid amount of bytes read");
         EVP_DigestUpdate(sha3_512_ctx, buf, bytes_read);
     }
     EVP_DigestFinal_ex(sha3_512_ctx, sha3_512_value, &sha3_512_value_len);
@@ -378,7 +383,7 @@ bool FileChannel::sendFileWithId(QString file_uri,
     return true;
 }
 
-bool FileChannel::sendNextChunk(FileId id) {
+bool FileChannel::sendNextChunk(file_id_t id) {
     //TODO: check either file digest or file last modified time, if they don't match before, start from chunk 0
     auto it =
         std::find_if(queuedFiles.begin(), 
@@ -392,7 +397,7 @@ bool FileChannel::sendNextChunk(FileId id) {
     return sendChunkWithId(id, it->path, it->cur_chunk++);
 }
 
-bool FileChannel::sendChunkWithId(FileId fid, std::filesystem::path &fpath, ChunkId cid) {
+bool FileChannel::sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, chunk_id_t cid) {
     std::ifstream file;
     Data::File::FileChunk chunk;
     char *buf;

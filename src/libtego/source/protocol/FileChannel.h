@@ -45,15 +45,16 @@ class FileChannel : public Channel
     Q_DISABLE_COPY(FileChannel);
 
 public:
-    typedef quint32 FileId;
-    typedef quint32 ChunkId;
-    static const int FileMaxChunkSize = 2000;
+    typedef quint32 file_id_t;
+    typedef quint32 chunk_id_t;
+    constexpr static int FileMaxChunkSize = 2000;
+    constexpr static int SHA3_512_BUFSIZE = 65535;
 
     explicit FileChannel(Direction direction, Connection *connection);
 
-    bool sendFileWithId(QString file_url, QDateTime time, FileId id);
-    bool sendNextChunk(FileId id);
-    bool sendChunkWithId(FileId fid, std::filesystem::path &fpath, ChunkId cid);
+    bool sendFileWithId(QString file_url, QDateTime time, file_id_t id);
+    bool sendNextChunk(file_id_t id);
+    bool sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, chunk_id_t cid);
 
 signals:
 protected:
@@ -61,23 +62,24 @@ protected:
     virtual bool allowOutboundChannelRequest(Data::Control::OpenChannel *request);
     virtual void receivePacket(const QByteArray &packet);
 private:
-    FileId nextFileId();
-    FileId file_id;
+    file_id_t nextFileId();
+    file_id_t file_id;
+    size_t fsize_to_chunks(size_t sz);
     
     struct queuedFile {
-        FileId id;
+        file_id_t id;
         std::filesystem::path path;
         size_t size;
-        ChunkId cur_chunk;
+        chunk_id_t cur_chunk;
         bool finished;
         bool peer_did_accept;
     };
 
     struct pendingRecvFile {
-        FileId id;
+        file_id_t id;
         std::filesystem::path path;
         size_t size;
-        ChunkId cur_chunk;
+        chunk_id_t cur_chunk;
     };
 
     std::vector<queuedFile> queuedFiles;            //files that have already been queued to be sent and the destination has replied accepting the transfer
