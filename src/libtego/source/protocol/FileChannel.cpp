@@ -278,8 +278,8 @@ void FileChannel::handleFileHeaderAck(const Data::File::FileHeaderAck &message){
     }
 }
 
-bool FileChannel::sendFileWithId(QString file_url,
-                                 __attribute__((unused)) QDateTime time,
+bool FileChannel::sendFileWithId(QString file_uri,
+                                 QDateTime,
                                  FileId id) {
     std::ifstream file;
     std::uintmax_t file_chunks;
@@ -304,15 +304,15 @@ bool FileChannel::sendFileWithId(QString file_url,
         return false;
     }
 
-    if (file_url.isEmpty()) {
-        BUG() << "File URL is empty, this should never have been reached";
+    if (file_uri.isEmpty()) {
+        BUG() << "File URI is empty, this should never have been reached";
         return false;
     }
 
     /* sendNextChunk will resume a transfer if connection was interrupted */
     if (sendNextChunk(id)) return true;
 
-    file_path = file_url.toStdString();
+    file_path = file_uri.toStdString();
 
     /* only allow regular files or symlinks chains to regular files */
     try {
@@ -325,7 +325,7 @@ bool FileChannel::sendFileWithId(QString file_url,
     try {
         file_size = std::filesystem::file_size(file_path);
     } catch (std::filesystem::filesystem_error &e) {
-        qWarning() << "Rejected file url, reason: " << e.what();
+        qWarning() << "Rejected file URI, reason: " << e.what();
         return false;
     }
 
