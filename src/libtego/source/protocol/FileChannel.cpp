@@ -137,12 +137,11 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
         response->set_accepted(false);
     } else {
         response->set_accepted(true);
-        /* Use the file id as part of the directory name */
-        /* TODO: windows */
-        dirname  = "/tmp/ricochet-";
-        dirname += connection()->serverHostname().remove(".onion").toStdString();
-        dirname += "-";
-        dirname += std::to_string(message.file_id());
+        /* Use the file id and onion url as part of the directory name */
+        dirname = fmt::format("{}/ricochet-{}-{}",
+                                QStandardPaths::TempLocation,
+                                connection()->serverHostname().remove(".onion").toStdString(),
+                                message.file_id());
 
         /* create directory to store chunks in /tmp */
         try {
