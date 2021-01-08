@@ -46,7 +46,6 @@ FileChannel::FileChannel(Direction direction, Connection *connection)
 {
 }
 
-//unused
 FileChannel::file_id_t FileChannel::nextFileId() {
     return ++file_id;
 }
