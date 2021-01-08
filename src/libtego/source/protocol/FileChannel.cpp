@@ -295,7 +295,6 @@ bool FileChannel::sendFileWithId(QString file_uri,
     queuedFile qf;
     Data::File::FileHeader header;
 
-    char *buf;
     std::streamsize bytes_read;
     
     EVP_MD_CTX *sha3_512_ctx;
@@ -342,24 +341,23 @@ bool FileChannel::sendFileWithId(QString file_uri,
 
     /* this amount of bytes is completly arbitrary, but keeping it rather low
      * helps with not using too much memory */
-    buf = new char[SHA3_512_BUFSIZE]();
+    auto buf = std::make_unique<char[]>(SHA3_512_BUFSIZE);
 
     /* Review this */
     sha3_512_ctx = EVP_MD_CTX_new();
     EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
     while (file.good()) {
-        file.read(buf, SHA3_512_BUFSIZE);
+        file.read(buf.get(), SHA3_512_BUFSIZE);
         bytes_read = file.gcount();
         /* the only time bytes_read would be >SHA3_512_BUFSIZE is if gcount thinks the
          * amount of bytes read is unrepresentable, in which case something has
          * gone wrong */
         TEGO_THROW_IF_TRUE_MSG(bytes_read > SHA3_512_BUFSIZE, "Invalid amount of bytes read");
-        EVP_DigestUpdate(sha3_512_ctx, buf, bytes_read);
+        EVP_DigestUpdate(sha3_512_ctx, buf.get(), bytes_read);
     }
     EVP_DigestFinal_ex(sha3_512_ctx, sha3_512_value, &sha3_512_value_len);
     EVP_MD_CTX_free(sha3_512_ctx);
 
-    delete[] buf;
     file.close();
 
     file_id = nextFileId();
@@ -399,7 +397,6 @@ bool FileChannel::sendNextChunk(file_id_t id) {
 bool FileChannel::sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, chunk_id_t cid) {
     std::ifstream file;
     Data::File::FileChunk chunk;
-    char *buf;
     std::streamsize bytes_read;
     EVP_MD_CTX *sha3_512_ctx;
     unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
@@ -427,9 +424,9 @@ bool FileChannel::sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, c
         return false;
     }
 
-    buf = new char[FileMaxChunkSize]();
+    auto buf = std::make_unique<char[]>(FileMaxChunkSize);
     
-    file.read(buf, FileMaxChunkSize);
+    file.read(buf.get(), FileMaxChunkSize);
     bytes_read = file.gcount();
     /* the only time bytes_read would be >65535 is if gcount thinks the
      * amount of bytes read is unrepresentable, in which case something has
@@ -440,7 +437,7 @@ bool FileChannel::sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, c
     /* review this */
     sha3_512_ctx = EVP_MD_CTX_new();
     EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
-    EVP_DigestUpdate(sha3_512_ctx, buf, bytes_read);
+    EVP_DigestUpdate(sha3_512_ctx, buf.get(), bytes_read);
     EVP_DigestFinal_ex(sha3_512_ctx, sha3_512_value, &sha3_512_value_len);
     EVP_MD_CTX_free(sha3_512_ctx);
 
@@ -449,10 +446,9 @@ bool FileChannel::sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, c
     chunk.set_file_id(fid);
     chunk.set_chunk_id(cid);
     chunk.set_chunk_size(bytes_read);
-    chunk.set_chunk_data(buf, bytes_read);
+    chunk.set_chunk_data(buf.get(), bytes_read);
     //TODO chunk.set_time_delta();
 
-    delete[] buf;
     file.close();
 
     Channel::sendMessage(chunk);
