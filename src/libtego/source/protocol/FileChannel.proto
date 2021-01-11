@@ -55,10 +55,10 @@ message FileHeader {
  * corrupted in transit, only the bad chunk will need to be resent, rather
  * than discarding the entire file */
 message FileChunk {
-    optional bytes sha3_512 = 1;     /* sha3_512 of the decoded chunk */
+    optional bytes sha3_512 = 1;    /* sha3_512 of the chunk */
     optional uint32 file_id = 2;
     optional uint32 chunk_id = 3;
-    optional uint32 chunk_size = 4; /* size of the encoded chunk */
+    optional uint32 chunk_size = 4; /* size of the chunk */
     optional bytes chunk_data = 5;
 }
 

@@ -449,7 +449,7 @@ bool ConnectionPrivate::writePacket(int channelId, const QByteArray &data)
         return false;
     }
 
-    re = socket->write(data);
+    re = socket->write(data, data.size());
     if (re != data.size()) {
         qDebug() << "Connection socket error" << socket->error() << "during write:" << socket->errorString();
         socket->abort();

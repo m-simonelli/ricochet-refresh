@@ -77,9 +77,13 @@ private:
 
     struct pendingRecvFile {
         file_id_t id;
-        std::filesystem::path path;
         size_t size;
         chunk_id_t cur_chunk;
+        chunk_id_t n_chunks;
+        chunk_id_t missing_chunks;
+        std::filesystem::path path;
+        std::string sha3_512;
+        std::string name;
     };
 
     std::vector<queuedFile> queuedFiles;            //files that have already been queued to be sent and the destination has replied accepting the transfer
