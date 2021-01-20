@@ -46,12 +46,50 @@ FileChannel::FileChannel(Direction direction, Connection *connection)
 {
 }
 
-FileChannel::file_id_t FileChannel::nextFileId() {
+FileChannel::file_id_t FileChannel::nextFileId()
+{
     return ++file_id;
 }
 
-size_t FileChannel::fsize_to_chunks(size_t sz) {
+size_t FileChannel::fsize_to_chunks(size_t sz)
+{
     return (sz + (FileMaxChunkSize - 1)) / FileMaxChunkSize;
+}
+
+void FileChannel::sha3_512_buf(const char *in, const unsigned int in_sz,
+                  unsigned char *out, unsigned int *out_sz)
+{
+    EVP_MD_CTX *sha3_512_ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
+    EVP_DigestUpdate(sha3_512_ctx, static_cast<const void *>(in), (size_t)in_sz);
+    EVP_DigestFinal_ex(sha3_512_ctx, out, out_sz);
+    EVP_MD_CTX_free(sha3_512_ctx);
+}
+
+void FileChannel::sha3_512_file(std::filesystem::path fpath,
+                   unsigned char *out, unsigned int *out_sz)
+{
+    std::ifstream file(fpath, std::ios::in | std::ios::binary);
+    //todo:check file open
+    sha3_512_file(file, out, out_sz);
+    file.close();
+}
+
+void FileChannel::sha3_512_file(std::ifstream &file,
+                    unsigned char *out, unsigned int *out_sz)
+{
+    auto buf = std::make_unique<char[]>(SHA3_512_BUFSIZE);
+
+    EVP_MD_CTX *sha3_512_ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
+    while (file.good()) {
+        file.read(buf.get(), SHA3_512_BUFSIZE);
+        auto bytes_read = file.gcount();
+        TEGO_THROW_IF_TRUE_MSG(bytes_read > SHA3_512_BUFSIZE, "Invalid amount of bytes read");
+        EVP_DigestUpdate(sha3_512_ctx, buf.get(), bytes_read);
+    }
+    EVP_DigestFinal_ex(sha3_512_ctx, out, out_sz);
+    EVP_MD_CTX_free(sha3_512_ctx);
 }
 
 bool FileChannel::allowInboundChannelRequest(
@@ -111,11 +149,9 @@ void FileChannel::receivePacket(const QByteArray &packet)
     }
 }
 
-void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
-    std::filesystem::path dirname;
+void FileChannel::handleFileHeader(const Data::File::FileHeader &message)
+{
     Data::File::FileHeaderAck *response = new Data::File::FileHeaderAck; //todo: replace this with a unique_ptr
-    Data::File::Packet packet;
-    pendingRecvFile prf;
 
     if (direction() != Inbound) {
         qWarning() << "Rejected inbound message (FileHeader) on an outbound channel";
@@ -140,13 +176,17 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
     } else if (!message.has_name()) {
         qWarning() << "Rejected file header with missing name";
         response->set_accepted(false);
+    } else if (message.name().find("..") != std::string::npos) {
+        qWarning() << "Rejected file header with name containing '..'";
+    } else if (message.name().find("/") != std::string::npos) {
+        qWarning() << "Rejected file header with name containing '/'";
     } else {
         response->set_accepted(true);
         /* Use the file id and onion url as part of the directory name */
-        dirname = fmt::format("{}/ricochet-{}-{}",
-                                QStandardPaths::writableLocation(QStandardPaths::TempLocation),
-                                connection()->serverHostname().remove(".onion").toStdString(),
-                                message.file_id());
+        std::filesystem::path dirname = fmt::format("{}/ricochet-{}-{}",
+                                                    QStandardPaths::writableLocation(QStandardPaths::TempLocation),
+                                                    connection()->serverHostname().remove(".onion").toStdString(),
+                                                    message.file_id());
 
         /* create directory to store chunks in /tmp */
         try {
@@ -157,6 +197,7 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
         }
 
         if (response->accepted()) {
+            pendingRecvFile prf;
             prf.id = message.file_id();
             prf.size = message.size();
 
@@ -173,24 +214,16 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message){
     }
 
     if (message.has_file_id()) {
-        /* send the response */
+        Data::File::Packet packet;
         response->set_file_id(message.file_id());
         packet.set_allocated_file_header_ack(response);
         Channel::sendMessage(packet);
     }
 }
 
-void FileChannel::handleFileChunk(const Data::File::FileChunk &message){
-    EVP_MD_CTX *sha3_512_ctx;
-    unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
-    unsigned int sha3_512_value_len;
-
-    std::filesystem::path fpath;
-    std::fstream chunk_file;
-    std::ofstream out_file;
-
+void FileChannel::handleFileChunk(const Data::File::FileChunk &message)
+{
     Data::File::FileChunkAck *response = new Data::File::FileChunkAck; //todo: replace this with a unique_ptr
-    Data::File::Packet packet;
 
     response->set_accepted(true);
     auto it =
@@ -209,23 +242,20 @@ void FileChannel::handleFileChunk(const Data::File::FileChunk &message){
     }
 
     if (response->accepted()) {
-        sha3_512_ctx = EVP_MD_CTX_new();
-        EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
-        EVP_DigestUpdate(sha3_512_ctx, message.chunk_data().c_str(), message.chunk_size());
-        EVP_DigestFinal_ex(sha3_512_ctx, sha3_512_value, &sha3_512_value_len);
-        EVP_MD_CTX_free(sha3_512_ctx);
+        unsigned char sha3_512_out[EVP_MAX_MD_SIZE];
+        unsigned int sha3_512_out_sz;
+        sha3_512_buf(message.chunk_data().c_str(), message.chunk_size(), sha3_512_out, &sha3_512_out_sz);
 
-        if (strncmp(reinterpret_cast<const char*>(sha3_512_value), message.sha3_512().c_str(), sha3_512_value_len) != 0) {
-            /* sha3_512 mismatch */
-            qWarning() << "rejecting chunk for sha3 mismatch : " << sha3_512_value << " : " << message.sha3_512().c_str();
+        if (strncmp(reinterpret_cast<const char *>(sha3_512_out), message.sha3_512().c_str(), sha3_512_out_sz) != 0) {
             response->set_accepted(false);
         } else {
-            fpath = it->path / std::to_string(message.chunk_id());
-            /* open (and clear contents if they exist) */
-            chunk_file.open(fpath, std::ios::out | std::ios::binary | std::ios::trunc);
+            std::filesystem::path chunk_path = it->path / std::to_string(message.chunk_id());
+            std::fstream chunk_file(chunk_path, std::ios::out | std::ios::binary | std::ios::trunc);
+
             if (!chunk_file.is_open()) {
                 BUG() << "could not open temp file for chunk (are permissions set correctly?)";
             }
+
             chunk_file.write(message.chunk_data().c_str(), message.chunk_size());
             chunk_file.close();
             it->missing_chunks--;
@@ -233,6 +263,7 @@ void FileChannel::handleFileChunk(const Data::File::FileChunk &message){
     }
 
     if (message.has_chunk_id()) {
+        Data::File::Packet packet;
         response->set_file_chunk_id(message.chunk_id());
         packet.set_allocated_file_chunk_ack(response);
         Channel::sendMessage(packet);
@@ -240,26 +271,45 @@ void FileChannel::handleFileChunk(const Data::File::FileChunk &message){
 
     if (it->missing_chunks == 0 && response->accepted()) {
         /* successfully finished transfer */
+
         /* concatenate chunks into one file */
-        //todo: move the file to the downloads directory
-        //todo: when moving the file to downloads directory, check if DOWNLOAD_DIR/it->name == canonical(DOWNLOAD_DIR/it->name) to catch file traversal attempts
-        //todo: sha3_512 validation
-        out_file.open(it->path/"out", std::ios::out | std::ios::binary | std::ios::trunc);
+        std::filesystem::path outf_path = it->path/"out";
+        std::ofstream out_file(outf_path, std::ios::out | std::ios::binary | std::ios::trunc);
         if (!out_file.is_open()) {
             BUG() << "could not open temp file for out file (are permissions set correctly?)";
         }
+
         for (chunk_id_t i = 0; i < it->n_chunks; i++) {
-            fpath = it->path / std::to_string(i);
-            /* write the chunk to the out file */
-            chunk_file.open(fpath, std::ios::in);
+            std::filesystem::path chunk_path = it->path / std::to_string(i);
+            std::fstream chunk_file(chunk_path, std::ios::in);
+
             if (!chunk_file.is_open()) {
                 BUG() << "could not open chunk file for reading";
             }
+
             out_file << chunk_file.rdbuf();
             chunk_file.close();
-            /* delete the chunk */
-            std::filesystem::remove(fpath);
+
+            std::filesystem::remove(chunk_path);
         }
+
+        out_file.close();
+
+        /* sha3_512 validation */
+        unsigned char sha3_512_out[EVP_MAX_MD_SIZE];
+        unsigned int sha3_512_out_sz;
+        sha3_512_file(outf_path, sha3_512_out, &sha3_512_out_sz);
+
+        if (strncmp(reinterpret_cast<const char*>(sha3_512_out), it->sha3_512.c_str(), sha3_512_out_sz) != 0) {
+            //todo: handle this better
+            std::filesystem::remove(outf_path);
+            closeChannel();
+            return;
+        }
+
+        /* move the file to downloads */
+        std::filesystem::path new_out_path = fmt::format("{}/{}", QStandardPaths::writableLocation(QStandardPaths::DownloadLocation), it->name);
+        std::filesystem::rename(outf_path, new_out_path);
 
         auto index = std::distance(pendingRecvFiles.begin(), it);
         pendingRecvFiles.erase(pendingRecvFiles.begin() + index);
@@ -277,7 +327,7 @@ void FileChannel::handleFileChunkAck(const Data::File::FileChunkAck &message){
         return;
     }
 
-    if (it->cur_chunk * FileMaxChunkSize > std::filesystem::file_size(it->path)) {
+    if (it->cur_chunk * FileMaxChunkSize > it->size) {
         it->finished = true;
     }
 
@@ -323,25 +373,7 @@ void FileChannel::handleFileHeaderAck(const Data::File::FileHeaderAck &message){
 
 bool FileChannel::sendFileWithId(QString file_uri,
                                  QDateTime,
-                                 file_id_t id) {
-    std::ifstream file;
-    std::uintmax_t file_chunks;
-    std::filesystem::path file_path;
-    std::filesystem::path file_dir;
-    std::string chunk_name;
-    uint64_t file_size;
-
-    file_id_t file_id;
-    queuedFile qf;
-    Data::File::FileHeader *header; //todo: replace this with a unique_ptr
-    Data::File::Packet packet;
-
-    std::streamsize bytes_read;
-    
-    EVP_MD_CTX *sha3_512_ctx;
-    unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
-    unsigned int sha3_512_value_len;
-
+                                 file_id_t id) {    
     if (direction() != Outbound) {
         BUG() << "Attempted to send outbound message on non outbound channel";
         return false;
@@ -356,7 +388,7 @@ bool FileChannel::sendFileWithId(QString file_uri,
     if (sendNextChunk(id)) return true;
 
     file_uri.remove(0, 7); //todo: remove this when file transfer UI is implemented, because proper file paths should be given
-    file_path = file_uri.toStdString();
+    std::filesystem::path file_path = file_uri.toStdString();
 
     /* only allow regular files or symlinks chains to regular files */
     try {
@@ -366,6 +398,7 @@ bool FileChannel::sendFileWithId(QString file_uri,
         return false;
     }
 
+    std::uintmax_t file_size;
     try {
         file_size = std::filesystem::file_size(file_path);
     } catch (std::filesystem::filesystem_error &e) {
@@ -373,36 +406,22 @@ bool FileChannel::sendFileWithId(QString file_uri,
         return false;
     }
 
-    file_chunks = fsize_to_chunks(file_size);
-    
-    file.open(file_path, std::ios::in | std::ios::binary);
+    auto file_chunks = fsize_to_chunks(file_size);
+    std::ifstream file(file_path, std::ios::in | std::ios::binary);
     if (!file) {
         qWarning() << "Failed to open file for sending header";
         return false;
     }
 
-    /* this amount of bytes is completly arbitrary, but keeping it rather low
-     * helps with not using too much memory */
-    auto buf = std::make_unique<char[]>(SHA3_512_BUFSIZE);
-
-    /* Review this */
-    sha3_512_ctx = EVP_MD_CTX_new();
-    EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
-    while (file.good()) {
-        file.read(buf.get(), SHA3_512_BUFSIZE);
-        bytes_read = file.gcount();
-        /* the only time bytes_read would be >SHA3_512_BUFSIZE is if gcount thinks the
-         * amount of bytes read is unrepresentable, in which case something has
-         * gone wrong */
-        TEGO_THROW_IF_TRUE_MSG(bytes_read > SHA3_512_BUFSIZE, "Invalid amount of bytes read");
-        EVP_DigestUpdate(sha3_512_ctx, buf.get(), bytes_read);
-    }
-    EVP_DigestFinal_ex(sha3_512_ctx, sha3_512_value, &sha3_512_value_len);
-    EVP_MD_CTX_free(sha3_512_ctx);
+    unsigned char sha3_512_out[EVP_MAX_MD_SIZE];
+    unsigned int sha3_512_out_len;
+    sha3_512_file(file, sha3_512_out, &sha3_512_out_len);
 
     file.close();
 
-    file_id = nextFileId();
+    auto file_id = nextFileId();
+
+    queuedFile qf;
     qf.id = file_id;
     qf.path = file_path.string();
     qf.cur_chunk = 0;
@@ -410,17 +429,15 @@ bool FileChannel::sendFileWithId(QString file_uri,
     qf.size = file_size;
 
     pendingFileHeaders.push_back(qf);
-    auto it =
-        std::find_if(pendingFileHeaders.begin(), 
-        pendingFileHeaders.end(), 
-        [qf](const queuedFile &pfh) { return qf.id == pfh.id; });
 
-    header = new Data::File::FileHeader;
+    Data::File::FileHeader *header = new Data::File::FileHeader; //todo: replace this with a unique_ptr
     header->set_file_id(file_id);
     header->set_size(file_size);
     header->set_chunk_count(file_chunks);
-    header->set_sha3_512(sha3_512_value, sha3_512_value_len);
+    header->set_sha3_512(sha3_512_out, sha3_512_out_len);
     header->set_name(file_path.filename());
+    
+    Data::File::Packet packet;
     packet.set_allocated_file_header(header);
 
     Channel::sendMessage(packet);
@@ -437,69 +454,66 @@ bool FileChannel::sendNextChunk(file_id_t id) {
         [id](const queuedFile &qf) { return qf.id == id; });
 
     if (it == queuedFiles.end()) return false;
-    if (it->cur_chunk * FileMaxChunkSize > std::filesystem::file_size(it->path)) it->finished = true;
+    if (it->cur_chunk * FileMaxChunkSize > it->size) it->finished = true;
     if (it->finished) return false;
 
     return sendChunkWithId(id, it->path, it->cur_chunk++);
 }
 
 bool FileChannel::sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, chunk_id_t cid) {
-    std::ifstream file;
-    Data::File::FileChunk *chunk;
-    Data::File::Packet packet;
-    std::streamsize bytes_read;
-    EVP_MD_CTX *sha3_512_ctx;
-    unsigned char sha3_512_value[EVP_MAX_MD_SIZE];
-    unsigned int sha3_512_value_len;
-
     if (direction() != Outbound) {
         BUG() << "Attempted to send outbound message on non outbound channel";
         return false;
     }
 
-    file.open(fpath, std::ios::in | std::ios::binary);
+    std::ifstream file(fpath, std::ios::in | std::ios::binary);
     if (!file) {
         qWarning() << "Failed to open file for sending chunk";
         return false;
     }
 
-    if (FileMaxChunkSize * cid > std::filesystem::file_size(fpath)) {
+    std::uintmax_t file_size;
+    try {
+        file_size = std::filesystem::file_size(fpath);
+    } catch (std::filesystem::filesystem_error &e) {
+        qWarning() << "Could not send get file size when sending chunk by id: " << e.what();
+    }
+
+    if (cid * FileMaxChunkSize > file_size) {
         qWarning() << "Attempted to start read beyond eof";
         return false;
     }
     
     /* go to the pos of the chunk */
-    file.seekg(FileMaxChunkSize * cid);
+    file.seekg(cid * FileMaxChunkSize);
     if (!file) {
         qWarning() << "Failed to seek to last position in file for chunking";
         return false;
     }
 
     auto buf = std::make_unique<char[]>(FileMaxChunkSize);
-    
+
     file.read(buf.get(), FileMaxChunkSize);
-    bytes_read = file.gcount();
+    auto bytes_read = file.gcount();
     /* the only time bytes_read would be >65535 is if gcount thinks the
      * amount of bytes read is unrepresentable, in which case something has
      * gone wrong */
     TEGO_THROW_IF_TRUE_MSG(bytes_read > 65535, "Invalid amount of bytes read");
     
     /* hash this chunk */
-    /* review this */
-    sha3_512_ctx = EVP_MD_CTX_new();
-    EVP_DigestInit_ex(sha3_512_ctx, EVP_sha3_512(), NULL);
-    EVP_DigestUpdate(sha3_512_ctx, buf.get(), bytes_read);
-    EVP_DigestFinal_ex(sha3_512_ctx, sha3_512_value, &sha3_512_value_len);
-    EVP_MD_CTX_free(sha3_512_ctx);
+    unsigned char sha3_512_out[EVP_MAX_MD_SIZE];
+    unsigned int sha3_512_out_sz;
+    sha3_512_buf(buf.get(), bytes_read, sha3_512_out, &sha3_512_out_sz);
 
     /* send this chunk */
-    chunk = new Data::File::FileChunk;
-    chunk->set_sha3_512(sha3_512_value, sha3_512_value_len);
+    Data::File::FileChunk *chunk = new Data::File::FileChunk;
+    chunk->set_sha3_512(sha3_512_out, sha3_512_out_sz);
     chunk->set_file_id(fid);
     chunk->set_chunk_id(cid);
     chunk->set_chunk_size(bytes_read);
     chunk->set_chunk_data(buf.get(), bytes_read);
     //TODO chunk.set_time_delta();
+    Data::File::Packet packet;
     packet.set_allocated_file_chunk(chunk);
     file.close();
 

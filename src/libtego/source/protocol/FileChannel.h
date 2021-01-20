@@ -53,8 +53,6 @@ public:
     explicit FileChannel(Direction direction, Connection *connection);
 
     bool sendFileWithId(QString file_url, QDateTime time, file_id_t id);
-    bool sendNextChunk(file_id_t id);
-    bool sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, chunk_id_t cid);
 
 signals:
 protected:
@@ -94,6 +92,36 @@ private:
     void handleFileChunk(const Data::File::FileChunk &message);
     void handleFileChunkAck(const Data::File::FileChunkAck &message);
     void handleFileHeaderAck(const Data::File::FileHeaderAck &message);
+    bool sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, chunk_id_t cid);
+    bool sendNextChunk(file_id_t id);
+    /*
+     * get the sha3_512 hash of a buffer
+     * @param in : pointer to a buffer with the data to be hashed
+     * @param in_sz : size of in
+     * @param out : pointer to a buffer with at least EVP_MAX_MD_SIZE bytes
+     * allocated to it
+     * @param out_sz : pointer to an int which will have the amount of bytes
+     * written stored in
+     */
+    void sha3_512_buf(const char *in, const unsigned int in_sz, unsigned char *out, unsigned int *out_sz);
+    /*
+     * get the sha3_512 hash of a file by path
+     * @param fpath : file path
+     * @param out : pointer to a buffer with at least EVP_MAX_MD_SIZE bytes
+     * allocated to it
+     * @param out_sz : pointer to an int which will have the amount of bytes
+     * written stored in
+     */
+    void sha3_512_file(std::filesystem::path fpath, unsigned char *out, unsigned int *out_sz);
+    /*
+     * get the sha3_512 hash of a file by ifstream reference
+     * @param file : ifstream that has the opened file
+     * @param out : pointer to a buffer with at least EVP_MAX_MD_SIZE bytes
+     * allocated to it
+     * @param out_sz : pointer to an int which will have the amount of bytes
+     * written stored in
+     */
+    void sha3_512_file(std::ifstream &file, unsigned char *out, unsigned int *out_sz);
 };
 
 }
