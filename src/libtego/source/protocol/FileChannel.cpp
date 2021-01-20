@@ -306,6 +306,7 @@ void FileChannel::handleFileChunk(const Data::File::FileChunk &message)
             closeChannel();
             return;
         }
+        //todo: signals
 
         /* move the file to downloads */
         std::filesystem::path new_out_path = fmt::format("{}/{}", QStandardPaths::writableLocation(QStandardPaths::DownloadLocation), it->name);

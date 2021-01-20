@@ -35,6 +35,7 @@
 
 #include "protocol/Channel.h"
 #include "protocol/FileChannel.pb.h"
+#include "tego/tego.h"
 
 namespace Protocol
 {
@@ -55,6 +56,9 @@ public:
     bool sendFileWithId(QString file_url, QDateTime time, file_id_t id);
 
 signals:
+    void fileReceived(const QDateTime &time, file_id_t id);
+    void fileAcknowledged(file_id_t id, tego_bool_t accepted);
+    
 protected:
     virtual bool allowInboundChannelRequest(const Data::Control::OpenChannel *request, Data::Control::ChannelResult *result);
     virtual bool allowOutboundChannelRequest(Data::Control::OpenChannel *request);
