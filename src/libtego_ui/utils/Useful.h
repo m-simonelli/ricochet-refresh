@@ -30,76 +30,39 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "HiddenService.h"
-#include "TorControl.h"
-#include "TorSocket.h"
-#include "utils/CryptoKey.h"
-#include "utils/Useful.h"
+#ifndef UTILS_USEFUL_H
+#define UTILS_USEFUL_H
 
-using namespace Tor;
-
-HiddenService::HiddenService(QObject *parent)
-    : QObject(parent), m_status(NotCreated)
+/* Print a warning for bug conditions, and assert on a debug build.
+ *
+ * This should be used in place of Q_ASSERT for bug conditions, along
+ * with a proper error case for release-mode builds. For example:
+ *
+ * if (!connection || !user) {
+ *     BUG() << "Request" << request << "should have a connection and user";
+ *     return false;
+ * }
+ *
+ * Do not confuse bugs with actual error cases; BUG() should never be
+ * triggered unless the code or logic is wrong.
+ */
+#if !defined(QT_NO_DEBUG) || defined(QT_FORCE_ASSERTS)
+# define BUG() Explode(__FILE__,__LINE__), qWarning() << "BUG:"
+namespace {
+class Explode
 {
-}
-
-HiddenService::HiddenService(const CryptoKey &privateKey, QObject *parent)
-    : QObject(parent), m_status(NotCreated)
-{
-    setPrivateKey(privateKey);
-    m_status = Offline;
-}
-
-void HiddenService::setStatus(Status newStatus)
-{
-    if (m_status == newStatus)
-        return;
-
-    Status old = m_status;
-    m_status = newStatus;
-
-    emit statusChanged(m_status, old);
-
-    if (m_status == Online)
-        emit serviceOnline();
-}
-
-void HiddenService::addTarget(const Target &target)
-{
-    m_targets.append(target);
-}
-
-void HiddenService::addTarget(quint16 servicePort, QHostAddress targetAddress, quint16 targetPort)
-{
-    Target t = { targetAddress, servicePort, targetPort };
-    m_targets.append(t);
-}
-
-void HiddenService::setPrivateKey(const CryptoKey &key)
-{
-    if (m_privateKey.isLoaded()) {
-        BUG() << "Cannot change the private key on an existing HiddenService";
-        return;
+public:
+    const char *file;
+    int line;
+    Explode(const char *file, int line) : file(file), line(line) { }
+    ~Explode() {
+        qt_assert("something broke!", file, line);
     }
-
-    if (!key.isPrivate()) {
-        BUG() << "Cannot create a hidden service with a public key";
-        return;
-    }
-
-    m_privateKey = key;
-    m_hostname = QString::fromUtf8(m_privateKey.torServiceID()) + QStringLiteral(".onion");
-    emit privateKeyChanged();
+};
 }
+#else
+# define BUG() qWarning() << "BUG:"
+#endif
 
-void HiddenService::servicePublished()
-{
-    if (m_hostname.isEmpty()) {
-        qDebug() << "Failed to read hidden service hostname";
-        return;
-    }
-
-    qDebug() << "Hidden service published successfully";
-    setStatus(Online);
-}
+#endif
 

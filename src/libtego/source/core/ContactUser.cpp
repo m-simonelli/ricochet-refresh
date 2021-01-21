@@ -35,7 +35,6 @@
 #include "ContactsManager.h"
 #include "utils/SecureRNG.h"
 #include "utils/Useful.h"
-#include "utils/Settings.h"
 #include "core/ContactIDValidator.h"
 #include "core/OutgoingContactRequest.h"
 #include "core/ConversationModel.h"
@@ -47,15 +46,14 @@
 #include "user.hpp"
 #include "globals.hpp"
 
-ContactUser::ContactUser(UserIdentity *ident, const QString& hostname, QObject *parent)
+ContactUser::ContactUser(UserIdentity *ident, const QString& hostname, Status status, QObject *parent)
     : QObject(parent)
     , identity(ident)
     , m_connection(0)
     , m_outgoingSocket(0)
-    , m_status(Offline)
+    , m_status(status)
     , m_lastReceivedChatID(0)
     , m_contactRequest(0)
-    , m_settings(0)
     , m_conversation(0)
     , m_hostname(hostname)
 {
@@ -63,32 +61,11 @@ ContactUser::ContactUser(UserIdentity *ident, const QString& hostname, QObject *
 
     const auto serviceId = hostname.chopped(tego::static_strlen(".onion"));
 
-    m_settings = new SettingsObject(QStringLiteral("contacts.%1").arg(serviceId));
-    connect(m_settings, &SettingsObject::modified, this, &ContactUser::onSettingsModified);
-
     m_conversation = new ConversationModel(this);
     m_conversation->setContact(this);
 
-    // TODO: this is where we load old requests
-    loadContactRequest();
     updateStatus();
     updateOutgoingSocket();
-}
-
-ContactUser::~ContactUser()
-{
-    delete m_settings;
-}
-
-void ContactUser::loadContactRequest()
-{
-    if (m_contactRequest)
-        return;
-
-    if (m_settings->read("request.status") != QJsonValue::Undefined) {
-        // TODO: we need to pass down the connection message (and also the sender) from frontned to here
-        this->createContactRequest("");
-    }
 }
 
 void ContactUser::createContactRequest(const QString& msg)
@@ -99,12 +76,6 @@ void ContactUser::createContactRequest(const QString& msg)
     connect(m_contactRequest, &OutgoingContactRequest::removed, this, &ContactUser::requestRemoved);
     connect(m_contactRequest, &OutgoingContactRequest::accepted, this, &ContactUser::requestAccepted);
     updateStatus();
-}
-
-ContactUser *ContactUser::addNewContact(UserIdentity *identity, const QString& contactHostname)
-{
-    ContactUser *user = new ContactUser(identity, contactHostname);
-    return user;
 }
 
 void ContactUser::updateStatus()
@@ -120,16 +91,17 @@ void ContactUser::updateStatus()
         }
     } else if (m_connection && m_connection->isConnected()) {
         newStatus = Online;
-    } else if (settings()->read("rejected").toBool()) {
+    } else if (m_status == RequestRejected) {
         newStatus = RequestRejected;
     } else {
         newStatus = Offline;
     }
 
     if (newStatus == m_status)
+    {
         return;
+    }
 
-    m_status = newStatus;
     {
         auto userId = this->toTegoUserId();
         switch(newStatus)
@@ -146,16 +118,10 @@ void ContactUser::updateStatus()
         }
 
     }
+    m_status = newStatus;
     emit statusChanged();
 
     updateOutgoingSocket();
-}
-
-void ContactUser::onSettingsModified(const QString &key, const QJsonValue &value)
-{
-    Q_UNUSED(value);
-    if (key == QLatin1String("nickname"))
-        emit nicknameChanged();
 }
 
 void ContactUser::updateOutgoingSocket()
@@ -203,25 +169,9 @@ void ContactUser::onConnected()
         return;
     }
 
-    m_settings->write("lastConnected", QDateTime::currentDateTime());
-
     if (m_contactRequest && m_connection->purpose() == Protocol::Connection::Purpose::OutboundRequest) {
-        qDebug() << "Sending contact request for " << m_hostname << " " << nickname();
+        qDebug() << "Sending contact request for " << m_hostname;
         m_contactRequest->sendRequest(m_connection);
-    }
-
-    /* XXX: is there any point in having this? the setting isn't used anywhere else... */
-    if (!m_settings->read("sentUpgradeNotification").isNull())
-        m_settings->unset("sentUpgradeNotification");
-
-    /* The 'rejected' mark comes from failed authentication to someone who we thought was a known
-     * contact. Normally, it would mean that you were removed from that person's contacts. It's
-     * possible for this to be undone; for example, if that person sends you a new contact request,
-     * it will be automatically accepted. If this happens, unset the 'rejected' flag for correct UI.
-     */
-    if (m_settings->read("rejected").toBool()) {
-        qDebug() << "Contact had marked us as rejected, but now they've connected again. Re-enabling.";
-        m_settings->unset("rejected");
     }
 
     updateStatus();
@@ -239,7 +189,6 @@ void ContactUser::onConnected()
 void ContactUser::onDisconnected()
 {
     qDebug() << "Contact" << m_hostname << "disconnected";
-    m_settings->write("lastConnected", QDateTime::currentDateTime());
 
     if (m_connection) {
         if (m_connection->isConnected()) {
@@ -257,33 +206,14 @@ void ContactUser::onDisconnected()
     emit connectionChanged(m_connection);
 }
 
-SettingsObject *ContactUser::settings()
-{
-    return m_settings;
-}
-
-QString ContactUser::nickname() const
-{
-    return m_settings->read("nickname").toString();
-}
-
-void ContactUser::setNickname(const QString &nickname)
-{
-    m_settings->write("nickname", nickname);
-}
-
 QString ContactUser::hostname() const
 {
-    if (m_hostname.isEmpty())
-    {
-        m_hostname = m_settings->read("hostname").toString();
-    }
     return m_hostname;
 }
 
 quint16 ContactUser::port() const
 {
-    return m_settings->read("port", 9878).toInt();
+    return 9878;
 }
 
 QString ContactUser::contactID() const
@@ -300,7 +230,6 @@ void ContactUser::setHostname(const QString &hostname)
 
     m_hostname = hostname;
 
-    m_settings->write("hostname", fh);
     updateOutgoingSocket();
 }
 
@@ -319,7 +248,6 @@ void ContactUser::deleteContact()
 
     emit contactDeleted(this);
 
-    m_settings->undefine();
     deleteLater();
 }
 
@@ -390,7 +318,6 @@ void ContactUser::assignConnection(const QSharedPointer<Protocol::Connection> &c
                 BUG() << "Outgoing contact request not unset after implicit accept during connection";
         } else if (!m_contactRequest && !knownToPeer) {
             qDebug() << "Contact says we're unknown; marking as rejected";
-            settings()->write("rejected", true);
             connection->close();
             updateStatus();
             updateOutgoingSocket();
@@ -507,12 +434,12 @@ void ContactUser::clearConnection()
 
 std::unique_ptr<tego_user_id_t> ContactUser::toTegoUserId() const
 {
-        // convert our hostname to just the service id raw string
-        auto serviceIdString = this->hostname().chopped(tego::static_strlen(".onion")).toUtf8();
-        // ensure valid service id
-        auto serviceId = std::make_unique<tego_v3_onion_service_id>(serviceIdString.data(), serviceIdString.size());
-        // create user id object from service id
-        auto userId = std::make_unique<tego_user_id>(*serviceId.get());
+    // convert our hostname to just the service id raw string
+    auto serviceIdString = this->hostname().chopped(tego::static_strlen(".onion")).toUtf8();
+    // ensure valid service id
+    auto serviceId = std::make_unique<tego_v3_onion_service_id>(serviceIdString.data(), serviceIdString.size());
+    // create user id object from service id
+    auto userId = std::make_unique<tego_user_id>(*serviceId.get());
 
-        return userId;
+    return userId;
 }

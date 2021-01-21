@@ -118,9 +118,6 @@ extern "C" {
 #include <QtGlobal>
 #include <QTime>
 #include <QTimer>
-#ifdef Q_OS_MAC
-#   include <QtMac>
-#endif // Q_OS_MAC
 #include <QtQml>
 #include <QUrl>
 #include <QVariant>

@@ -10,7 +10,6 @@ namespace
     constexpr int consumeInterval = 10;
 
     // data
-    std::unique_ptr<QTimer> taskTimer;
     std::vector<std::function<void()>> taskQueue;
     std::mutex taskQueueLock;
 
@@ -147,17 +146,17 @@ namespace
         push_task([=]() -> void
         {
             logger::println("new process status : {}", status);
-            auto torManger = shims::TorManager::torManager;
+            auto torManager = shims::TorManager::torManager;
             switch(status)
             {
                 case tego_tor_process_status_running:
-                    torManger->setRunning("Yes");
+                    torManager->setRunning("Yes");
                     break;
                 case tego_tor_process_status_external:
-                    torManger->setRunning("External");
+                    torManager->setRunning("External");
                     break;
                 default:
-                    torManger->setRunning("No");
+                    torManager->setRunning("No");
                     break;
             }
         });
@@ -269,19 +268,14 @@ namespace
             auto contact = contactsManager->getShimContactByContactId(serviceIdToContactId(serviceId));
             auto outgoingContactRequest = contact->contactRequest();
 
+            logger::trace();
+
             if (requestAccepted)
             {
-                // delete the request block entirely like in OutgoingContactRequest::removeRequest
-                SettingsObject so(QStringLiteral("contacts.%1").arg(serviceId));
-                so.unset("request");
-
                 outgoingContactRequest->setAccepted();
             }
             else
             {
-                SettingsObject so(QStringLiteral("contacts.%1").arg(serviceId));
-                so.write("request.status", 1);
-
                 outgoingContactRequest->setRejected();
                 contact->setStatus(shims::ContactUser::RequestRejected);
             }
@@ -304,16 +298,21 @@ namespace
             auto contactsManager = userIdentity->getContacts();
             auto contact = contactsManager->getShimContactByContactId(serviceIdToContactId(serviceId));
 
-            switch(status)
+            if (contact != nullptr)
             {
-                case tego_user_status_online:
-                    contact->setStatus(shims::ContactUser::Online);
-                    break;
-                case tego_user_status_offline:
-                    contact->setStatus(shims::ContactUser::Offline);
-                    break;
-                default:
-                    break;
+                switch(status)
+                {
+                    case tego_user_status_online:
+                        contact->setStatus(shims::ContactUser::Online);
+                        contactsManager->setContactStatus(contact, shims::ContactUser::Online);
+                        break;
+                    case tego_user_status_offline:
+                        contact->setStatus(shims::ContactUser::Offline);
+                        contactsManager->setContactStatus(contact, shims::ContactUser::Offline);
+                        break;
+                    default:
+                        break;
+                }
             }
         });
     }
@@ -379,7 +378,7 @@ namespace
         push_task([=]() -> void
         {
             SettingsObject so(QStringLiteral("identity"));
-            so.write("serviceKey", keyBlob);
+            so.write("privateKey", keyBlob);
         });
     }
 }
