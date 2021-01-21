@@ -70,7 +70,7 @@ private:
     
     struct queuedFile {
         file_id_t id;
-        std::filesystem::path path;
+        std::string path;
         size_t size;
         chunk_id_t cur_chunk;
         bool finished;
@@ -83,7 +83,7 @@ private:
         chunk_id_t cur_chunk;
         chunk_id_t n_chunks;
         chunk_id_t missing_chunks;
-        std::filesystem::path path;
+        std::string path;
         std::string sha3_512;
         std::string name;
     };
@@ -96,7 +96,7 @@ private:
     void handleFileChunk(const Data::File::FileChunk &message);
     void handleFileChunkAck(const Data::File::FileChunkAck &message);
     void handleFileHeaderAck(const Data::File::FileHeaderAck &message);
-    bool sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, chunk_id_t cid);
+    bool sendChunkWithId(file_id_t fid, std::string &fpath, chunk_id_t cid);
     bool sendNextChunk(file_id_t id);
     /*
      * get the sha3_512 hash of a buffer
@@ -116,7 +116,7 @@ private:
      * @param out_sz : pointer to an int which will have the amount of bytes
      * written stored in
      */
-    void sha3_512_file(std::filesystem::path fpath, unsigned char *out, unsigned int *out_sz);
+    void sha3_512_file(std::string &fpath, unsigned char *out, unsigned int *out_sz);
     /*
      * get the sha3_512 hash of a file by ifstream reference
      * @param file : ifstream that has the opened file

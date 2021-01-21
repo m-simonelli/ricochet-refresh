@@ -66,11 +66,13 @@ void FileChannel::sha3_512_buf(const char *in, const unsigned int in_sz,
     EVP_MD_CTX_free(sha3_512_ctx);
 }
 
-void FileChannel::sha3_512_file(std::filesystem::path fpath,
+void FileChannel::sha3_512_file(std::string &fpath,
                    unsigned char *out, unsigned int *out_sz)
 {
     std::ifstream file(fpath, std::ios::in | std::ios::binary);
-    //todo:check file open
+    if (!file.is_open()) {
+        BUG() << "Could not open file for sha3_512, are permissions set correctly?";
+    }
     sha3_512_file(file, out, out_sz);
     file.close();
 }
@@ -183,16 +185,15 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message)
     } else {
         response->set_accepted(true);
         /* Use the file id and onion url as part of the directory name */
-        std::filesystem::path dirname = fmt::format("{}/ricochet-{}-{}",
+        QString dirname = QString::fromStdString(fmt::format("{}/ricochet-{}-{}",
                                                     QStandardPaths::writableLocation(QStandardPaths::TempLocation),
                                                     connection()->serverHostname().remove(".onion").toStdString(),
-                                                    message.file_id());
+                                                    message.file_id()));
 
         /* create directory to store chunks in /tmp */
-        try {
-            std::filesystem::create_directory(dirname);
-        } catch (std::filesystem::filesystem_error &e) {
-            qWarning() << "Could not create tmp directory, reason: " << e.what();
+        QDir dir;
+        if (!dir.mkdir(dirname)) {
+            qWarning() << "Could not create tmp directory";
             response->set_accepted(false);
         }
 
@@ -205,7 +206,7 @@ void FileChannel::handleFileHeader(const Data::File::FileHeader &message)
             prf.n_chunks = message.chunk_count();
             prf.missing_chunks = message.chunk_count();
 
-            prf.path = dirname;
+            prf.path = dirname.toStdString();
             prf.name = message.has_name() ? message.name() : std::to_string(message.file_id());
             prf.sha3_512 = message.sha3_512();
 
@@ -249,7 +250,7 @@ void FileChannel::handleFileChunk(const Data::File::FileChunk &message)
         if (strncmp(reinterpret_cast<const char *>(sha3_512_out), message.sha3_512().c_str(), sha3_512_out_sz) != 0) {
             response->set_accepted(false);
         } else {
-            std::filesystem::path chunk_path = it->path / std::to_string(message.chunk_id());
+            std::string chunk_path = it->path + std::to_string(message.chunk_id());
             std::fstream chunk_file(chunk_path, std::ios::out | std::ios::binary | std::ios::trunc);
 
             if (!chunk_file.is_open()) {
@@ -273,14 +274,14 @@ void FileChannel::handleFileChunk(const Data::File::FileChunk &message)
         /* successfully finished transfer */
 
         /* concatenate chunks into one file */
-        std::filesystem::path outf_path = it->path/"out";
+        std::string outf_path = it->path + "out";
         std::ofstream out_file(outf_path, std::ios::out | std::ios::binary | std::ios::trunc);
         if (!out_file.is_open()) {
             BUG() << "could not open temp file for out file (are permissions set correctly?)";
         }
 
         for (chunk_id_t i = 0; i < it->n_chunks; i++) {
-            std::filesystem::path chunk_path = it->path / std::to_string(i);
+            std::string chunk_path = it->path + std::to_string(i);
             std::fstream chunk_file(chunk_path, std::ios::in);
 
             if (!chunk_file.is_open()) {
@@ -290,7 +291,8 @@ void FileChannel::handleFileChunk(const Data::File::FileChunk &message)
             out_file << chunk_file.rdbuf();
             chunk_file.close();
 
-            std::filesystem::remove(chunk_path);
+            QDir dir;
+            dir.remove(QString::fromStdString(chunk_path));
         }
 
         out_file.close();
@@ -302,15 +304,16 @@ void FileChannel::handleFileChunk(const Data::File::FileChunk &message)
 
         if (strncmp(reinterpret_cast<const char*>(sha3_512_out), it->sha3_512.c_str(), sha3_512_out_sz) != 0) {
             //todo: handle this better
-            std::filesystem::remove(outf_path);
+            QDir dir;
+            dir.remove(QString::fromStdString(outf_path));
             closeChannel();
             return;
         }
         //todo: signals
 
         /* move the file to downloads */
-        std::filesystem::path new_out_path = fmt::format("{}/{}", QStandardPaths::writableLocation(QStandardPaths::DownloadLocation), it->name);
-        std::filesystem::rename(outf_path, new_out_path);
+        std::string new_out_path = fmt::format("{}/{}", QStandardPaths::writableLocation(QStandardPaths::DownloadLocation), it->name);
+        QFile::rename(QString::fromStdString(outf_path), QString::fromStdString(new_out_path));
 
         auto index = std::distance(pendingRecvFiles.begin(), it);
         pendingRecvFiles.erase(pendingRecvFiles.begin() + index);
@@ -389,26 +392,19 @@ bool FileChannel::sendFileWithId(QString file_uri,
     if (sendNextChunk(id)) return true;
 
     file_uri.remove(0, 7); //todo: remove this when file transfer UI is implemented, because proper file paths should be given
-    std::filesystem::path file_path = file_uri.toStdString();
 
     /* only allow regular files or symlinks chains to regular files */
-    try {
-        file_path = std::filesystem::canonical(file_path);
-    } catch (std::filesystem::filesystem_error &e) {
-        qWarning() << "Could not resolve symlink path/file path, reason: " << e.what();
+    QFileInfo fi(file_uri);
+    QString file_path = fi.canonicalFilePath();
+    if (file_path.size() == 0) {
+        qWarning() << "Could net resolve file path";
         return false;
     }
 
-    std::uintmax_t file_size;
-    try {
-        file_size = std::filesystem::file_size(file_path);
-    } catch (std::filesystem::filesystem_error &e) {
-        qWarning() << "Rejected file URI, reason: " << e.what();
-        return false;
-    }
+    auto file_size = fi.size();
 
     auto file_chunks = fsize_to_chunks(file_size);
-    std::ifstream file(file_path, std::ios::in | std::ios::binary);
+    std::ifstream file(file_path.toStdString(), std::ios::in | std::ios::binary);
     if (!file) {
         qWarning() << "Failed to open file for sending header";
         return false;
@@ -424,7 +420,7 @@ bool FileChannel::sendFileWithId(QString file_uri,
 
     queuedFile qf;
     qf.id = file_id;
-    qf.path = file_path.string();
+    qf.path = file_path.toStdString();
     qf.cur_chunk = 0;
     qf.peer_did_accept = false;
     qf.size = file_size;
@@ -436,7 +432,7 @@ bool FileChannel::sendFileWithId(QString file_uri,
     header->set_size(file_size);
     header->set_chunk_count(file_chunks);
     header->set_sha3_512(sha3_512_out, sha3_512_out_len);
-    header->set_name(file_path.filename());
+    header->set_name(fi.fileName().toStdString());
     
     Data::File::Packet packet;
     packet.set_allocated_file_header(header);
@@ -461,7 +457,7 @@ bool FileChannel::sendNextChunk(file_id_t id) {
     return sendChunkWithId(id, it->path, it->cur_chunk++);
 }
 
-bool FileChannel::sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, chunk_id_t cid) {
+bool FileChannel::sendChunkWithId(file_id_t fid, std::string &fpath, chunk_id_t cid) {
     if (direction() != Outbound) {
         BUG() << "Attempted to send outbound message on non outbound channel";
         return false;
@@ -473,12 +469,8 @@ bool FileChannel::sendChunkWithId(file_id_t fid, std::filesystem::path &fpath, c
         return false;
     }
 
-    std::uintmax_t file_size;
-    try {
-        file_size = std::filesystem::file_size(fpath);
-    } catch (std::filesystem::filesystem_error &e) {
-        qWarning() << "Could not send get file size when sending chunk by id: " << e.what();
-    }
+    QFileInfo fi(QString::fromStdString(fpath));
+    auto file_size = fi.size();
 
     if (cid * FileMaxChunkSize > file_size) {
         qWarning() << "Attempted to start read beyond eof";
