@@ -56,6 +56,7 @@ extern "C" {
 #include <mutex>
 #include <iostream>
 #include <filesystem>
+#include <fstream>
 #include <set>
 #include <sstream>
 #include <optional>
