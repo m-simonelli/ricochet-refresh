@@ -4,6 +4,7 @@ Makefile.*
 *.user.*
 debug
 release
+build/
 *.pdb
 *.app
 .packagingrc
