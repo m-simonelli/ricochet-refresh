@@ -188,8 +188,8 @@ void ConversationModel::sendQueuedMessages()
     auto file_channel = findOrCreateChannelForContact<Protocol::FileChannel>(m_contact, Protocol::Channel::Outbound);
 
     // sendQueuedMessages is called at channelOpened
-    if (!chat_channel->isOpened())
-        return;
+    if (!chat_channel->isOpened()) return;
+    if (!file_channel->isOpened()) return;
 
     // Iterate backwards, from oldest to newest messages
     for (int i = messages.size() - 1; i >= 0; i--) {
