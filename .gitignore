@@ -46,3 +46,4 @@ ricochet-refresh
 \.vscode/c_cpp_properties\.json
 \.vscode/
 notes/*
+*.log
