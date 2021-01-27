@@ -46,6 +46,9 @@
  * Do not confuse bugs with actual error cases; BUG() should never be
  * triggered unless the code or logic is wrong.
  */
+#ifdef BUG
+  #undef BUG
+#endif
 #if !defined(QT_NO_DEBUG) || defined(QT_FORCE_ASSERTS)
 # define BUG() Explode(__FILE__,__LINE__), qWarning() << "BUG:"
 namespace {
