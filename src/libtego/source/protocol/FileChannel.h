@@ -42,8 +42,8 @@ namespace Protocol
 
 class FileChannel : public Channel
 {
-    Q_OBJECT;
-    Q_DISABLE_COPY(FileChannel);
+    Q_OBJECT
+    Q_DISABLE_COPY(FileChannel)
 
 public:
     typedef quint32 file_id_t;

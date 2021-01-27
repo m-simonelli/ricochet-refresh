@@ -692,7 +692,7 @@ extern "C"
                 *out_configured = TEGO_TRUE;
             }
         }, error);
-    };
+    }
 
     size_t tego_context_get_tor_logs_size(
         const tego_context_t* context,
