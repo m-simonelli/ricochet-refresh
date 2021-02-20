@@ -9,3 +9,7 @@ function htmlEscaped(str) {
     return str
 }
 
+// QML doesn't provide a way to replace in strings :(
+function replace(str, from, to) {
+    str = str.replace(from, to);
+}
