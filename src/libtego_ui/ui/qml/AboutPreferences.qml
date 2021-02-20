@@ -20,10 +20,6 @@ ColumnLayout {
         // todo: translations for "version" and "point"
         RowLayout {
             anchors.centerIn: parent
-            
-            Accessible.description: "Current Ricochet Refresh version"
-            Accessible.role: Accessible.StaticText
-            Accessible.name: ricoString.text + "version " + Utils.replace(versString.text, ".", qsTr(" point "))
 
             Text {
                 id: ricoString
@@ -36,13 +32,14 @@ ColumnLayout {
                 text: qsTr("%1").arg(uiMain.version)
                 Accessible.ignored: true
             }
+            
+            Accessible.description: qsTr("Current Ricochet Refresh version") // todo: translation
+            Accessible.role: Accessible.StaticText
+            Accessible.name: ricoString.text + qsTr("version ") + Utils.replace(versString.text, ".", qsTr(" point "))
         }
     }
 
     Label {
-        Accessible.name: homePageLink.text
-        Accessible.role: Accessible.StaticText
-    
         horizontalAlignment: Qt.AlignHCenter
         Layout.fillWidth: true
 
@@ -54,13 +51,12 @@ ColumnLayout {
             text: "<a href='https://ricochetrefresh.net/'>ricochetrefresh.net</a>"
             onLinkActivated: Qt.openUrlExternally("https://ricochetrefresh.net")
         }
+
+        Accessible.name: qsTr("Ricochet Refresh web home page") // todo: translation
+        Accessible.role: Accessible.StaticText
     }
 
     Flickable {
-        Accessible.description: "The license of ricochet refresh and it's dependencies"
-        Accessible.name: "License"
-        Accessible.role: Accessible.StaticText
-        
         // this is so that the scroll bars doesn't spill over the border
         Layout.rightMargin: 8
         Layout.bottomMargin: 8
@@ -77,7 +73,12 @@ ColumnLayout {
         }
 
         ScrollBar.vertical: ScrollBar { }
-        ScrollBar.horizontal: ScrollBar { }
+        ScrollBar.horizontal: ScrollBar { } // openssl license has some long lines that need to be accounted for
+
+        // todo: translation
+        Accessible.description: qsTr("The license of ricochet refresh and it's dependencies")
+        Accessible.name: qsTr("License") // todo: translation
+        Accessible.role: Accessible.StaticText
     }
 }
 

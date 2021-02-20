@@ -14,38 +14,61 @@ GridLayout {
     property bool hasValidRequest: contactIdField.acceptableInput && nameField.text.length
 
     Label {
-        text: qsTr("ID:")
         Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+
+        text: qsTr("ID:")
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
     }
 
     ContactIDField {
         id: contactIdField
+
         Layout.fillWidth: true
         readOnly: contactFields.readOnly
         showCopyButton: false
     }
 
     Label {
-        text: qsTr("Name:")
         Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+
+        text: qsTr("Name:")
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
     }
 
     TextField {
         id: nameField
+
         Layout.fillWidth: true
         readOnly: contactFields.readOnly
+
+        Accessible.role: Accessible.Dialog
+        Accessible.name: text
+        Accessible.description: qsTr("Field to enter the contact's name into") // todo: translation
     }
 
     Label {
-        text: qsTr("Message:")
         Layout.alignment: Qt.AlignTop | Qt.AlignRight
+
+        text: qsTr("Message:")
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
     }
 
     TextArea {
         id: messageField
-        Layout.fillWidth: true
-        Layout.fillHeight: true
+        
         textFormat: TextEdit.PlainText
         readOnly: contactFields.readOnly
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+
+        Accessible.role: Accessible.Dialog
+        Accessible.name: text
+        Accessible.description: qsTr("Field for the contact's message") // todo: translation
     }
 }

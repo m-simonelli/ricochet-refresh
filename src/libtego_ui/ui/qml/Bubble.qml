@@ -50,11 +50,16 @@ Rectangle {
 
     Label {
         id: label
-        wrapMode: Text.Wrap
-        width: maximumWidth - 16
-        textFormat: Text.PlainText
+
+        Accessible.name: label.text
+        Accessible.role: Accessible.StaticText
+
         x: 6
         y: 6
+
+        wrapMode: Text.Wrap
+        width: maximumWidth - 16
+
+        textFormat: Text.PlainText
     }
 }
-

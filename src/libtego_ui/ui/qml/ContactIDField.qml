@@ -29,8 +29,6 @@ FocusScope {
             placeholderText: "ricochet:"
             focus: true
 
-            onTextChanged: errorBubble.clear()
-
             ContactIDValidator {
                 id: idValidator
 
@@ -77,8 +75,12 @@ FocusScope {
             Bubble {
                 id: copyBubble
                 target: field
-                text: qsTr("Copied to clipboard")
                 displayed: false
+
+                text: qsTr("Copied to clipboard")
+
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
             }
 
             Timer {
@@ -86,12 +88,26 @@ FocusScope {
                 interval: 1000
                 onTriggered: copyBubble.displayed = false
             }
+
+            onTextChanged: errorBubble.clear()
+
+            Accessible.role: Accessible.Dialog
+            Accessible.name: text
+            // todo: translation
+            Accessible.description: qsTr("Field for the contact's ricochet I D") // todo: translation
         }
 
         Button {
-            text: qsTr("Copy")
             visible: contactId.showCopyButton
+
+            text: qsTr("Copy")
+
             onClicked: field.copyLoudly()
+
+            Accessible.role: Accessible.Button
+            Accessible.name: text
+            Accessible.description: qsTr("Copies your ricochet I D") // todo: translation
+            Accessible.onPressAction: field.copyLoudly()
         }
     }
 }

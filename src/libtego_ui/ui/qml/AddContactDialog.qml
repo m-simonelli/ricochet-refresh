@@ -48,7 +48,11 @@ ApplicationWindow {
             Layout.fillWidth: true
             horizontalAlignment: Qt.AlignHCenter
             wrapMode: Text.Wrap
+
             text: qsTr("Share your Ricochet ID to allow connection requests")
+            
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
         }
 
         ContactIDField {
@@ -105,14 +109,27 @@ ApplicationWindow {
 
         Button {
             text: qsTr("Cancel")
+
             onClicked: addContactWindow.close()
+
+            Accessible.role: Accessible.Button
+            Accessible.name: text
+            Accessible.description: qsTr("Closes the contact add window") // todo: translation
+            Accessible.onPressAction: addContactWindow.close()
         }
 
         Button {
-            text: qsTr("Add")
             isDefault: true
             enabled: fields.hasValidRequest
+
+            text: qsTr("Add")
+
             onClicked: addContactWindow.accept()
+
+            Accessible.role: Accessible.Button
+            Accessible.name: text
+            Accessible.description: qsTr("Adds the contact") // todo: translation
+            Accessible.onPressAction: addContactWindow.close()
         }
     }
 
