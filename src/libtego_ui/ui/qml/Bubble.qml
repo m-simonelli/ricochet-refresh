@@ -51,9 +51,6 @@ Rectangle {
     Label {
         id: label
 
-        Accessible.name: label.text
-        Accessible.role: Accessible.StaticText
-
         x: 6
         y: 6
 
@@ -61,5 +58,8 @@ Rectangle {
         width: maximumWidth - 16
 
         textFormat: Text.PlainText
+
+        Accessible.name: label.text
+        Accessible.role: Accessible.StaticText
     }
 }
