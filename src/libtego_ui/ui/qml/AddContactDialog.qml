@@ -142,5 +142,9 @@ ApplicationWindow {
         shortcut: "Escape"
         onTriggered: addContactWindow.close()
     }
+
+    Accessible.role: Accessible.Dialog
+    Accessible.name: qsTr("Add Contact") // todo: translation
+    Accessible.description: qsTr("Dialog to add contacts from ") // todo: translation
 }
 

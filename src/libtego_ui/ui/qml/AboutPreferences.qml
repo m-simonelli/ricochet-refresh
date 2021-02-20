@@ -80,5 +80,9 @@ ColumnLayout {
         Accessible.name: qsTr("License") // todo: translation
         Accessible.role: Accessible.StaticText
     }
+
+    Accessible.role: Accessible.Window
+    Accessible.name: qsTr("About") // todo: translation
+    Accessible.description: qsTr("About page, contains license and version information") // todo: translation
 }
 
