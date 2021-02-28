@@ -101,7 +101,7 @@ Column {
 
             onLinkActivated: {
                 textField.deselect()
-                delegate.showContextMenu(link)
+                delegate.showLinkLeftClickContextMenu(link)
             }
 
             // Workaround an incomplete fix for QTBUG-31646
@@ -119,15 +119,48 @@ Column {
         }
     }
 
+    function showLinkLeftClickContextMenu(link) {
+        var object = leftClickContextMenu.createObject(delegate, (link !== undefined) ? { 'hoveredLink' : link } : { })
+        // XXX FIXME QtQuickControls private API. The only other option is 'visible', and it is not reliable. See PR#183
+        object.popupVisibleChanged.connect(function() { if (!object.__popupVisible) object.destroy(1000) })
+        object.popup()
+    }
+
     function showContextMenu(link) {
-        var object = contextMenu.createObject(delegate, (link !== undefined) ? { 'hoveredLink': link } : { })
-        // XXX QtQuickControls private API. The only other option is 'visible', and it is not reliable. See PR#183
+        var object = rightClickContextMenu.createObject(delegate, (link !== undefined) ? { 'hoveredLink': link } : { })
+        // XXX FIXME QtQuickControls private API. The only other option is 'visible', and it is not reliable. See PR#183
         object.popupVisibleChanged.connect(function() { if (!object.__popupVisible) object.destroy(1000) })
         object.popup()
     }
 
     Component {
-        id: contextMenu
+        id: leftClickContextMenu
+
+        Menu {
+            property string hoveredLink: textField.hasOwnProperty('hoveredLink') ? textField.hoveredLink : ""
+            MenuItem {
+                text: qsTr("Copy Link")
+                visible: hoveredLink.length > 0
+                onTriggered: LinkedText.copyToClipboard(hoveredLink)
+            }
+            MenuItem {
+                text: qsTr("Open with Browser")
+                visible: hoveredLink.length > 0 && hoveredLink.substr(0,4).toLowerCase() == "http"
+                onTriggered: {
+                    if (uiSettings.data.alwaysOpenBrowser || contact.settings.data.alwaysOpenBrowser) {
+                        Qt.openUrlExternally(hoveredLink)
+                    } else {
+                        var window = uiMain.findParentWindow(delegate)
+                        var object = createDialog("OpenBrowserDialog.qml", { 'link': hoveredLink, 'contact': contact }, window)
+                        object.visible = true
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: rightClickContextMenu
 
         Menu {
             property string hoveredLink: textField.hasOwnProperty('hoveredLink') ? textField.hoveredLink : ""
@@ -153,7 +186,7 @@ Column {
                 id: linkAddContact
                 text: qsTr("Add as Contact")
                 visible: hoveredLink.length > 0 && (hoveredLink.substr(0,9).toLowerCase() == "ricochet:"
-                                                    || hoveredLink.substr(0,8).toLowerCase() == "torsion:")
+                                                    || hoveredLink.substr(0,8).toLowerCase() == "torsion:") // fixme: this should be removed, especially since the regex no longer accepts torsion id's
                 onTriggered: {
                     var object = createDialog("AddContactDialog.qml", { 'staticContactId': hoveredLink }, chatWindow)
                     object.visible = true

@@ -9,6 +9,7 @@ Rectangle {
 
     property alias model: messageView.model
 
+    // todo: this is out of date, scroll view works fine
     /* As of Qt 5.5.0, ScrollView is too buggy to use. It often fails to keep the
      * view scrolled to the bottom, and moves erratically on wheel events. */
     Rectangle {
