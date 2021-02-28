@@ -159,6 +159,10 @@ FocusScope {
                     if (textInput.length > 2000)
                         textInput.remove(2000, textInput.length)
                 }
+
+                Accessible.role: Accessible.EditableText
+                Accessible.name: qsTr("Message area") // todo: translation
+                Accessible.description: qsTr("Write the message to be sent here. Press enter to send") // todo: translation
             }
         }
     }
