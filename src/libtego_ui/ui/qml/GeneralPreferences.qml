@@ -15,12 +15,24 @@ ColumnLayout {
         onCheckedChanged: {
             uiSettings.write("combinedChatWindow", checked)
         }
+
+        Accessible.role: QAccessible.CheckBox
+        Accessible.name: text
+        Accessible.onPressAction: {
+            uiSettings.write("combinedChatWindow", checked)
+        }
     }
 
     CheckBox {
         text: qsTr("Open links in default browser without prompting")
         checked: uiSettings.data.alwaysOpenBrowser || false
         onCheckedChanged: {
+            uiSettings.write("alwaysOpenBrowser", checked)
+        }
+
+        Accessible.role: QAccessible.CheckBox
+        Accessible.name: text
+        Accessible.onPressAction: {
             uiSettings.write("alwaysOpenBrowser", checked)
         }
     }
@@ -31,11 +43,21 @@ ColumnLayout {
         onCheckedChanged: {
             uiSettings.write("playAudioNotification", checked)
         }
+
+        Accessible.role: QAccessible.CheckBox
+        Accessible.name: text
+        Accessible.onPressAction: {
+            uiSettings.write("playAudioNotification", checked)
+        }
     }
     RowLayout {
         Item { width: 16 }
 
-        Label { text: qsTr("Volume") }
+        Label {
+            text: qsTr("Volume")
+            Accessible.role: QAccessible.StaticText
+            Accessible.name: text
+        }
 
         Slider {
             maximumValue: 1.0
@@ -45,12 +67,25 @@ ColumnLayout {
             onValueChanged: {
                 uiSettings.write("notificationVolume", value)
             }
+
+            Accessible.role: QAccessible.Slider
+            Accessible.name: qsTr("Volume")
+            Accessible.onIncreaseAction: {
+                value += 0.125 // 8 volume settings
+            }
+            Accessible.onDecreaseAction: {
+                value -= 0.125
+            }
         }
     }
 
     RowLayout {
         z: 2
-        Label { text: qsTr("Language") }
+        Label {
+            text: qsTr("Language")
+            Accessible.role: QAccessible.StaticText
+            Accessible.name: text
+        }
 
         ComboBox {
             id: languageBox
@@ -83,6 +118,10 @@ ColumnLayout {
                     onTriggered: restartBubble.displayed = false
                 }
             }
+
+            Accessible.role: QAccessible.ComboBox
+            Accessible.name: qsTr("Languages") // todo: translation
+            Accessible.description: qsTr("What language ricochet will use") // todo: translation
         }
     }
 
