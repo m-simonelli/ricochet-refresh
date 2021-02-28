@@ -47,7 +47,7 @@ GridLayout {
 
         Accessible.role: Accessible.Dialog
         Accessible.name: text
-        Accessible.description: qsTr("Field to enter the contact's name into") // todo: translation
+        Accessible.description: qsTr("Field for the contact's nickname") // todo: translation
     }
 
     Label {
