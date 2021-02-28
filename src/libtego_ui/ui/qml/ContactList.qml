@@ -79,6 +79,10 @@ ScrollView {
                         case ContactUser.Outdated: return qsTr("Outdated").toLowerCase()
                     }
                 }
+                
+                Accessible.role: QAccessible.StaticText
+                Accessible.name: text
+                Accessible.description: qsTr("Status for the contact") // todo: translation
             }
 
             Rectangle {

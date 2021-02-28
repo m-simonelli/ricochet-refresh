@@ -34,6 +34,8 @@ FocusScope {
 
                 onFailed: {
                     var contact
+                    // XXX: how should accessibility be implemented here?
+                    // should there be a sound for errors? 
                     if ((contact = matchingContact(field.text)))
                         errorBubble.show(qsTr("<b>%1</b> is already your contact").arg(Utils.htmlEscaped(contact.nickname)))
                     else if (matchesIdentity(field.text))
