@@ -39,20 +39,35 @@ Item {
         MenuItem {
             text: qsTr("Open Window")
             onTriggered: openWindow()
+
+            Accessible.role: QAccessible.StaticText
+            Accessible.name: text
         }
         MenuItem {
             text: qsTr("Details...")
             onTriggered: openPreferences()
+
+            Accessible.role: QAccessible.StaticText
+            Accessible.name: text
         }
         MenuItem {
             text: qsTr("Rename")
             onTriggered: renameTriggered()
+
+            Accessible.role: QAccessible.StaticText
+            Accessible.name: text
         }
         MenuSeparator { }
         MenuItem {
             text: qsTr("Remove")
             onTriggered: removeContact()
+
+            Accessible.role: QAccessible.StaticText
+            Accessible.name: text
         }
+
+        Accessible.role: QAccessible.List
+        Accessible.name: qsTr("Contact options")
     }
 
     Loader {
