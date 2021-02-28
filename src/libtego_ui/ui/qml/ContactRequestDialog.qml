@@ -53,6 +53,9 @@ ApplicationWindow {
             horizontalAlignment: Qt.AlignHCenter
             wrapMode: Text.Wrap
             text: qsTr("Someone new is asking to connect to you")
+
+            Accessible.role: QAccessible.PopupMenu
+            Accessible.name: text
         }
 
         Item { height: 1 }
@@ -101,12 +104,20 @@ ApplicationWindow {
         Button {
             text: qsTr("Reject")
             onClicked: contactRequestDialog.reject()
+
+            Accessible.role: QAccessible.button
+            Accessible.name: text
+            Accessible.description: qsTr("Rejects the incoming contact request")
         }
 
         Button {
             text: qsTr("Accept")
             enabled: hasValidContact
             onClicked: contactRequestDialog.accept()
+
+            Accessible.role: QAccessible.button
+            Accessible.name: text
+            Accessible.description: qsTr("Accepts the incoming contact request")
         }
     }
 
