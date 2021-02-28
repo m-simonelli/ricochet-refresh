@@ -34,12 +34,6 @@ ApplicationWindow {
         }
     }
 
-    Timer {
-        id: retakeFocus
-        onTriggered: chatPage.forceActiveFocus()
-        interval: 1
-    }
-
     ChatPage {
         id: chatPage
         anchors.fill: parent
@@ -49,5 +43,9 @@ ApplicationWindow {
         shortcut: StandardKey.Close
         onTriggered: chatWindow.close()
     }
+
+    Accessible.role: Accessible.Window
+    Accessible.name: qsTr("Chat with ") + title === "" ? qsTr("unknown user") : title // todo: translation
+    Accessible.description: qsTr("Chat window for user ") + title === "" ? qsTr("unknown user") : title // todo: translation
 }
 
