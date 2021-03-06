@@ -105,7 +105,7 @@ ApplicationWindow {
             text: qsTr("Reject")
             onClicked: contactRequestDialog.reject()
 
-            Accessible.role: Accessible.button
+            Accessible.role: Accessible.Button
             Accessible.name: text
             Accessible.description: qsTr("Rejects the incoming contact request")
         }
@@ -115,7 +115,7 @@ ApplicationWindow {
             enabled: hasValidContact
             onClicked: contactRequestDialog.accept()
 
-            Accessible.role: Accessible.button
+            Accessible.role: Accessible.Button
             Accessible.name: text
             Accessible.description: qsTr("Accepts the incoming contact request")
         }
