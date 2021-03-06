@@ -54,7 +54,7 @@ ApplicationWindow {
             wrapMode: Text.Wrap
             text: qsTr("Someone new is asking to connect to you")
 
-            Accessible.role: QAccessible.PopupMenu
+            Accessible.role: Accessible.PopupMenu
             Accessible.name: text
         }
 
@@ -105,7 +105,7 @@ ApplicationWindow {
             text: qsTr("Reject")
             onClicked: contactRequestDialog.reject()
 
-            Accessible.role: QAccessible.button
+            Accessible.role: Accessible.button
             Accessible.name: text
             Accessible.description: qsTr("Rejects the incoming contact request")
         }
@@ -115,7 +115,7 @@ ApplicationWindow {
             enabled: hasValidContact
             onClicked: contactRequestDialog.accept()
 
-            Accessible.role: QAccessible.button
+            Accessible.role: Accessible.button
             Accessible.name: text
             Accessible.description: qsTr("Accepts the incoming contact request")
         }

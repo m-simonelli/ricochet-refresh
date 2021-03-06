@@ -120,7 +120,7 @@ Column {
     }
 
     function showLinkLeftClickContextMenu(link) {
-        var object = leftClickContextMenu.createObject(delegate, (link !== undefined) ? { 'hoveredLink' : link } : { })
+        var object = hyperLinkLeftClickContextMenu.createObject(delegate, (link !== undefined) ? { 'hoveredLink' : link } : { })
         // XXX FIXME QtQuickControls private API. The only other option is 'visible', and it is not reliable. See PR#183
         object.popupVisibleChanged.connect(function() { if (!object.__popupVisible) object.destroy(1000) })
         object.popup()
@@ -134,7 +134,7 @@ Column {
     }
 
     Component {
-        id: leftClickContextMenu
+        id: hyperLinkLeftClickContextMenu
 
         Menu {
             property string hoveredLink: textField.hasOwnProperty('hoveredLink') ? textField.hoveredLink : ""

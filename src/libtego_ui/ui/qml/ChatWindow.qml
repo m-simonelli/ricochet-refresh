@@ -43,9 +43,5 @@ ApplicationWindow {
         shortcut: StandardKey.Close
         onTriggered: chatWindow.close()
     }
-
-    Accessible.role: Accessible.Window
-    Accessible.name: qsTr("Chat with ") + (title === "") ? qsTr("Unknown user") : title // todo: translation
-    Accessible.description: qsTr("Chat window for user ") + (title === "") ? qsTr("Unknown user") : title // todo: translation
 }
 
