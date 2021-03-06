@@ -19,7 +19,7 @@ Item {
             Layout.fillHeight: true
             frameVisible: true
             
-            Accessible.role: QAccessible.List
+            Accessible.role: Accessible.List
             Accessible.name: qsTr("Contact list")
         }
 
@@ -93,9 +93,9 @@ Item {
                 readOnly: true
                 text: visible ? contactInfo.contact.contactID : ""
 
-                Accessible.role: QAccessible.Pane // todo: what role best fits contactidfield?
-                Accessible.name: text
-                Accessible.description: qsTr("Contact ID for ") + visible ? contactInfo.contact.nickname : qsTr("Unknown user") // todo: translations
+                Accessible.role: Accessible.Pane // todo: what role best fits contactidfield?
+                Accessible.name: qsTr("Contact ID for ") + visible ? nickname.text : qsTr("Unknown user") // todo: translations
+                Accessible.description: text
             }
 
             Item { height: 1; width: 1 }
@@ -113,7 +113,7 @@ Item {
                     text: qsTr("Rename")
                     onClicked: nickname.renameMode = !nickname.renameMode
 
-                    Accessible.role: QAccessible.Button
+                    Accessible.role: Accessible.Button
                     Accessible.name: text
                     Accessible.description: qsTr("Renames this contact") // todo: translation
                 }
@@ -124,7 +124,7 @@ Item {
                     text: qsTr("Remove")
                     onClicked: contactActions.removeContact()
 
-                    Accessible.role: QAccessible.Button
+                    Accessible.role: Accessible.Button
                     Accessible.name: text
                     Accessible.description: qsTr("Removes this contact") // todo: translation
                 }
@@ -135,12 +135,12 @@ Item {
                 width: 1
             }
 
-            Accessible.role: QAccessible.Window
-            Accessible.name: qsTr("Preferences for contact ") + (contact !== null) ? contact.nickname : qsTr("Unknown user") // todo: translations
+            Accessible.role: Accessible.Window
+            Accessible.name: qsTr("Preferences for contact ") + visible ? nickname.text : qsTr("Unknown user") // todo: translations
         }
     }
 
-    Accessible.role: QAccessible.Window
+    Accessible.role: Accessible.Window
     Accessible.name: qsTr("Contact Preferences Window") // todo: translation
     Accessible.description: qsTr("A list of all your contacts, with their ricochet IDs, and options such as renaming and removing") // todo: translation
 }
