@@ -94,6 +94,8 @@ ApplicationWindow {
             }
         }
 
+        Item { height: 8 } // XXX: fixes on linux, does this cause issues on other platforms?
+
         Keys.onEscapePressed: dialog.close()
         Keys.onReturnPressed: dialog.close()
     }
