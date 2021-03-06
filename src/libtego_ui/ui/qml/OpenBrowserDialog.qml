@@ -94,7 +94,7 @@ ApplicationWindow {
             }
         }
 
-        Item { height: 8 } // XXX: fixes on linux, does this cause issues on other platforms?
+        Item { height: Qt.platform.os === "linux" ? 8 : 0}
 
         Keys.onEscapePressed: dialog.close()
         Keys.onReturnPressed: dialog.close()

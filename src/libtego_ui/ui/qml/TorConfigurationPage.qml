@@ -63,8 +63,8 @@ Column {
             columns: 2
 
             /* without this the top of groupbox clips into the first row */
-            Item { height: 15; width: 1 } // XXX: this fixes a bug in linux, does it cause issues on other platforms?
-            Item { height: 15; width: 1 }
+            Item { height: Qt.platform.os === "linux" ? 15 : 0}
+            Item { height: Qt.platform.os === "linux" ? 15 : 0}
 
             Label {
                 text: qsTr("Proxy type:")
@@ -188,7 +188,7 @@ Column {
         ColumnLayout {
             anchors.fill: parent
 
-            Item { height: 15; width: 1 } // XXX: this fixes a bug in linux, does it cause issues on other platforms?
+            Item { height: Qt.platform.os === "linux" ? 15 : 0 }
 
             RowLayout {
                 Label {
@@ -226,7 +226,7 @@ Column {
         ColumnLayout {
             anchors.fill: parent
 
-            Item { height: 15; width: 1 } // XXX: this fixes a bug in linux, does it cause issues on other platforms?
+            Item { height: Qt.platform.os === "linux" ? 15 : 0 }
 
             Label {
                 text: qsTr("Enter one or more bridge relays (one per line):")
