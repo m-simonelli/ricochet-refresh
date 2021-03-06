@@ -15,4 +15,8 @@ TextArea {
             logDisplay.append(message)
         }
     }
+
+    Accessible.name: qsTr("Tor log") // todo: translation
+    Accessible.role: Accessible.StaticText
+    Accessible.description: text // XXX: seems like a bad idea to have the entire log read out
 }
