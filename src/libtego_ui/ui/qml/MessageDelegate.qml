@@ -147,7 +147,7 @@ Column {
                 text: qsTr("Open with Browser")
                 visible: hoveredLink.length > 0 && hoveredLink.substr(0,4).toLowerCase() == "http"
                 onTriggered: {
-                    if (uiSettings.data.alwaysOpenBrowser || contact.settings.data.alwaysOpenBrowser) {
+                    if (uiSettings.data.alwaysOpenBrowser /*|| contact.settings.data.alwaysOpenBrowser*/) { // todo: contact.settings.data is broken
                         Qt.openUrlExternally(hoveredLink)
                     } else {
                         var window = uiMain.findParentWindow(delegate)
@@ -173,7 +173,7 @@ Column {
                 text: qsTr("Open with Browser")
                 visible: hoveredLink.length > 0 && hoveredLink.substr(0,4).toLowerCase() == "http"
                 onTriggered: {
-                    if (uiSettings.data.alwaysOpenBrowser || contact.settings.data.alwaysOpenBrowser) {
+                    if (uiSettings.data.alwaysOpenBrowser /*|| contact.settings.data.alwaysOpenBrowser*/) { // todo: contact.settings.data is broken
                         Qt.openUrlExternally(hoveredLink)
                     } else {
                         var window = uiMain.findParentWindow(delegate)

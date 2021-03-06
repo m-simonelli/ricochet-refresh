@@ -22,7 +22,7 @@ ApplicationWindow {
     function close() { visible = false }
 
     property string link
-    property QtObject contact
+    property ContactUser contact
 
     ColumnLayout {
         id: layout
@@ -44,6 +44,10 @@ ApplicationWindow {
                 LinkedText.copyToClipboard(dialog.link)
                 dialog.close()
             }
+
+            Accessible.role: Accessible.StaticText
+            Accessible.name: qsTr("Warning") // todo: translation
+            Accessible.description: text
         }
 
         Item { width: 1; height: 1 }
@@ -54,11 +58,14 @@ ApplicationWindow {
             color: Qt.darker(palette.window, 1.5)
         }
 
+        // todo: contact.settings is broken
+        /*
         CheckBox {
             id: alwaysOpenContact
             text: qsTr("Don't ask again for links from %1").arg(contact ? Utils.htmlEscaped(contact.nickname) : "???")
             checked: contact.settings.data.alwaysOpenBrowser || false
         }
+        */
 
         CheckBox {
             id: alwaysOpenAll
@@ -71,8 +78,8 @@ ApplicationWindow {
             Button {
                 text: qsTr("Open Browser")
                 onClicked: {
-                    if (alwaysOpenContact.checked)
-                        contact.settings.write("alwaysOpenBrowser", true)
+                    //if (alwaysOpenContact.checked)
+                    //    contact.settings.write("alwaysOpenBrowser", true)
                     if (alwaysOpenAll.checked)
                         uiSettings.write("alwaysOpenBrowser", true)
                     Qt.openUrlExternally(link)

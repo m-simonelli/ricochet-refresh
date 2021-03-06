@@ -18,6 +18,9 @@ Column {
         text: qsTr("The Tor process was not started successfully. This is most likely an installation or system error.")
         font.bold: true
         wrapMode: Text.Wrap
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
     }
 
     Label {
@@ -48,6 +51,12 @@ Column {
         Button {
             text: qsTr("Quit")
             onClicked: Qt.quit()
+
+            Accessible.role: Accessible.Button
+            Accessible.name: text
+            Accessible.onPressAction: {
+                Qt.quit()
+            }
         }
     }
 }

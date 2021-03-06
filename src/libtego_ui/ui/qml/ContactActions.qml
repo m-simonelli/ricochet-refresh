@@ -63,6 +63,8 @@ Item {
         id: removeContactDialog
         source: "MessageDialogWrapper.qml"
         active: false
+
+        Accessible.role: Accessible.Window
     }
 }
 

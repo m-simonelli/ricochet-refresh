@@ -37,6 +37,11 @@ ApplicationWindow {
         anchors.fill: parent
         anchors.margins: 8
 
+        Accessible.role: Accessible.MenuBar
+        Accessible.name: qsTr("Menu Tabs") // todo: translation
+
+        /* QT will automatically set Accessible.text, also tabs fail to load if
+         * you set any accessibility properties */
         Tab {
             title: qsTr("General")
             source: Qt.resolvedUrl("GeneralPreferences.qml")

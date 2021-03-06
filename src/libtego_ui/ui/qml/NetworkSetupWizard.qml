@@ -100,6 +100,9 @@ ApplicationWindow {
                 text: qsTr("This computer's Internet connection is free of obstacles. I would like to connect directly to the Tor network.")
                 wrapMode: Text.Wrap
                 horizontalAlignment: Qt.AlignHCenter
+
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
             }
 
             Button {
@@ -108,6 +111,13 @@ ApplicationWindow {
                 isDefault: true
                 onClicked: {
                     // Reset to defaults and proceed to bootstrap page
+                    configPage.reset()
+                    configPage.save()
+                }
+
+                Accessible.role: Accessible.Button
+                Accessible.name: text
+                Accessible.onPressAction: {
                     configPage.reset()
                     configPage.save()
                 }
@@ -124,12 +134,21 @@ ApplicationWindow {
                 text: qsTr("This computer's Internet connection is censored, filtered, or proxied. I need to configure network settings.")
                 wrapMode: Text.Wrap
                 horizontalAlignment: Qt.AlignHCenter
+
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
             }
 
             Button {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: qsTr("Configure")
                 onClicked: window.openConfig()
+
+                Accessible.role: Accessible.Button
+                Accessible.name: text
+                Accessible.onPressAction: {
+                    window.openConfig()
+                }
             }
         }
     }

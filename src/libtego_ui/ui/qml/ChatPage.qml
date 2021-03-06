@@ -6,7 +6,7 @@ import im.ricochet 1.0
 FocusScope {
     id: chatPage
 
-    property var contact
+    property ContactUser contact
     property TextArea textField: textInput
     property var conversationModel: (contact !== null) ? contact.conversation : null
 

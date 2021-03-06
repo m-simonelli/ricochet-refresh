@@ -16,6 +16,10 @@ Column {
         //: \u2026 is ellipsis
         text: qsTr("Connecting to the Tor network\u2026")
         font.bold: true
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
+        Accessible.description: qsTr("Connection status");
     }
 
     ProgressBar {
@@ -23,6 +27,9 @@ Column {
         maximumValue: 100
         indeterminate: bootstrap.progress === undefined
         value: bootstrap.progress === undefined ? 0 : bootstrap.progress
+
+        Accessible.role: Accessible.ProgressBar
+        Accessible.description: qsTr("Connection progress");
     }
 
     Label {
@@ -50,6 +57,9 @@ Column {
         Button {
             text: qsTr("Back")
             onClicked: window.back()
+
+            Accessible.name: qsTr("Back")
+            Accessible.onPressAction: window.back()
         }
 
         Item { height: 1; Layout.fillWidth: true }
@@ -62,6 +72,14 @@ Column {
                 else
                     logDisplay.height = 300
             }
+
+            Accessible.name: text
+            Accessible.role: Accessible.Button
+            Accessible.description: logDisplay.height ? qsTr("Hides the tor progress log") : qsTr("Shows the tor progress log") // todo: translations
+            Accessible.onPressAction: {
+                if (logDisplay.height) logDisplay.height = 0
+                else logDisplay.height = 300
+            }
         }
 
         Item { height: 1; Layout.fillWidth: true }
@@ -71,6 +89,10 @@ Column {
             isDefault: true
             enabled: bootstrap.tag === "done"
             onClicked: window.visible = false
+
+            Accessible.name: text
+            Accessible.role: Accessible.Button
+            Accessible.onPressAction: window.visible = false
         }
     }
 }
