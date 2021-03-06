@@ -64,6 +64,10 @@ ApplicationWindow {
                 id: toolBar
                 // Needed to allow bubble to appear over contact list
                 z: 3
+
+                Accessible.role: Accessible.ToolBar
+                Accessible.name: qsTr("Toolbar") // todo: translation
+                Accessible.description: qsTr("Toolbar with connection status, add contact button, and preferences button") // todo: translation
             }
 
             Item {
@@ -82,6 +86,9 @@ ApplicationWindow {
                             actions.openWindow()
                         }
                     }
+
+                    Accessible.role: Accessible.Pane
+                    Accessible.name: qsTr("Contact pane") // todo: translation
                 }
 
                 Loader {

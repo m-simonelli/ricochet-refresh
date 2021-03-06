@@ -21,20 +21,12 @@ ToolBar {
                 var object = createDialog("AddContactDialog.qml", { }, window)
                 object.visible = true
             }
-            
-            Accessible.role: QAccessible.Button
-            Accessible.name: qsTr("Add Contact")
-            Accessible.description: qsTr("Shows the add contact dialogue") // todo: translation
         },
 
         Action {
             id: preferencesAction
             text: qsTr("Preferences")
             onTriggered: root.openPreferences()
-
-            Accessible.role: QAccessible.Button
-            Accessible.name: qsTr("Preferences")
-            Accessible.description: qsTr("Shows the preferences dialogue") // todo: translation
         }
     ]
 
@@ -83,6 +75,10 @@ ToolBar {
                     text: qsTr("Click to add contacts")
                 }
             }
+
+            Accessible.role: Accessible.Button
+            Accessible.name: qsTr("Add Contact")
+            Accessible.description: qsTr("Shows the add contact dialogue") // todo: translation
         }
 
         ToolButton {
@@ -90,6 +86,10 @@ ToolBar {
             implicitHeight: 24
             style: iconButtonStyle
             text: "\ue803" // iconFont gear
+
+            Accessible.role: Accessible.Button
+            Accessible.name: qsTr("Preferences")
+            Accessible.description: qsTr("Shows the preferences dialogue") // todo: translation
         }
     }
 }

@@ -80,7 +80,7 @@ ScrollView {
                     }
                 }
                 
-                Accessible.role: QAccessible.StaticText
+                Accessible.role: Accessible.StaticText
                 Accessible.name: text
                 Accessible.description: qsTr("Status for the contact") // todo: translation
             }
