@@ -16,7 +16,7 @@ ColumnLayout {
             uiSettings.write("combinedChatWindow", checked)
         }
 
-        Accessible.role: QAccessible.CheckBox
+        Accessible.role: Accessible.CheckBox
         Accessible.name: text
         Accessible.onPressAction: {
             uiSettings.write("combinedChatWindow", checked)
@@ -30,7 +30,7 @@ ColumnLayout {
             uiSettings.write("alwaysOpenBrowser", checked)
         }
 
-        Accessible.role: QAccessible.CheckBox
+        Accessible.role: Accessible.CheckBox
         Accessible.name: text
         Accessible.onPressAction: {
             uiSettings.write("alwaysOpenBrowser", checked)
@@ -44,7 +44,7 @@ ColumnLayout {
             uiSettings.write("playAudioNotification", checked)
         }
 
-        Accessible.role: QAccessible.CheckBox
+        Accessible.role: Accessible.CheckBox
         Accessible.name: text
         Accessible.onPressAction: {
             uiSettings.write("playAudioNotification", checked)
@@ -55,7 +55,7 @@ ColumnLayout {
 
         Label {
             text: qsTr("Volume")
-            Accessible.role: QAccessible.StaticText
+            Accessible.role: Accessible.StaticText
             Accessible.name: text
         }
 
@@ -68,7 +68,7 @@ ColumnLayout {
                 uiSettings.write("notificationVolume", value)
             }
 
-            Accessible.role: QAccessible.Slider
+            Accessible.role: Accessible.Slider
             Accessible.name: qsTr("Volume")
             Accessible.onIncreaseAction: {
                 value += 0.125 // 8 volume settings
@@ -83,7 +83,7 @@ ColumnLayout {
         z: 2
         Label {
             text: qsTr("Language")
-            Accessible.role: QAccessible.StaticText
+            Accessible.role: Accessible.StaticText
             Accessible.name: text
         }
 
@@ -119,7 +119,7 @@ ColumnLayout {
                 }
             }
 
-            Accessible.role: QAccessible.ComboBox
+            Accessible.role: Accessible.ComboBox
             Accessible.name: qsTr("Languages") // todo: translation
             Accessible.description: qsTr("What language ricochet will use") // todo: translation
         }
