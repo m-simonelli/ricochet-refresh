@@ -50,6 +50,9 @@ Column {
         width: parent.width
         text: qsTr("Does this computer need a proxy to access the internet?")
         wrapMode: Text.Wrap
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
     }
 
     GroupBox {
@@ -58,6 +61,10 @@ Column {
         GridLayout {
             anchors.fill: parent
             columns: 2
+
+            /* without this the top of groupbox clips into the first row */
+            Item { height: 15; width: 1 } // XXX: this fixes a bug in linux, does it cause issues on other platforms?
+            Item { height: 15; width: 1 }
 
             Label {
                 text: qsTr("Proxy type:")
@@ -79,11 +86,18 @@ Column {
                     id: proxyPalette
                     colorGroup: setup.proxyType == "" ? SystemPalette.Disabled : SystemPalette.Active
                 }
+
+                Accessible.role: Accessible.ComboBox
+                Accessible.name: selectedType
+                Accessible.description: qsTr("If you need a proxy to access the internet, select one from this list.") // todo: translation
             }
 
             Label {
                 text: qsTr("Address:")
                 color: proxyPalette.text
+
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
             }
             RowLayout {
                 Layout.fillWidth: true
@@ -92,21 +106,33 @@ Column {
                     Layout.fillWidth: true
                     enabled: setup.proxyType
                     placeholderText: qsTr("IP address or hostname")
+
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: placeholderText
+                    Accessible.description: qsTr("Enter the IP address or hostname of the proxy you wish to connect to") // todo: translation
                 }
                 Label {
                     text: qsTr("Port:")
                     color: proxyPalette.text
+
                 }
                 TextField {
                     id: proxyPortField
                     Layout.preferredWidth: 50
                     enabled: setup.proxyType
+
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: qsTr("Port") // todo: translation
+                    Accessible.description: qsTr("Enter the port of the proxy you wish to connect to") // todo: translation
                 }
             }
 
             Label {
                 text: qsTr("Username:")
                 color: proxyPalette.text
+
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
             }
             RowLayout {
                 Layout.fillWidth: true
@@ -116,16 +142,27 @@ Column {
                     Layout.fillWidth: true
                     enabled: setup.proxyType
                     placeholderText: qsTr("Optional")
+
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: qsTr("Username") // todo: translation
+                    Accessible.description: qsTr("If required, enter the username for the proxy you wish to connect to") // todo: translation
                 }
                 Label {
                     text: qsTr("Password:")
                     color: proxyPalette.text
+
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
                 }
                 TextField {
                     id: proxyPasswordField
                     Layout.fillWidth: true
                     enabled: setup.proxyType
                     placeholderText: qsTr("Optional")
+
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: qsTr("Password") // todo: translation
+                    Accessible.description: qsTr("If required, enter the password for the proxy you wish to connect to") // todo: translation
                 }
             }
         }
@@ -137,25 +174,38 @@ Column {
         width: parent.width
         text: qsTr("Does this computer's Internet connection go through a firewall that only allows connections to certain ports?")
         wrapMode: Text.Wrap
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
     }
 
     GroupBox {
         width: parent.width
         // Workaround OS X visual bug
         height: Math.max(implicitHeight, 40)
-        RowLayout {
+
+        /* without this the top of groupbox clips into the first row */
+        ColumnLayout {
             anchors.fill: parent
-            Label {
-                text: qsTr("Allowed ports:")
-            }
-            TextField {
-                id: allowedPortsField
-                Layout.fillWidth: true
-            }
-            Label {
-                text: qsTr("Example: 80,443")
-                SystemPalette { id: disabledPalette; colorGroup: SystemPalette.Disabled }
-                color: disabledPalette.text
+
+            Item { height: 15; width: 1 } // XXX: this fixes a bug in linux, does it cause issues on other platforms?
+
+            RowLayout {
+                Label {
+                    text: qsTr("Allowed ports:")
+
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
+                }
+                TextField {
+                    id: allowedPortsField
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Example: 80,443")
+                    
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: qsTr("Allowed ports") // todo: translations
+                    Accessible.description: placeholderText
+                }
             }
         }
     }
@@ -166,20 +216,32 @@ Column {
         width: parent.width
         text: qsTr("If this computer's Internet connection is censored, you will need to obtain and use bridge relays.")
         wrapMode: Text.Wrap
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
     }
 
     GroupBox {
         width: parent.width
         ColumnLayout {
             anchors.fill: parent
+
+            Item { height: 15; width: 1 } // XXX: this fixes a bug in linux, does it cause issues on other platforms?
+
             Label {
                 text: qsTr("Enter one or more bridge relays (one per line):")
+
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
             }
             TextArea {
                 id: bridgesField
                 Layout.fillWidth: true
                 Layout.preferredHeight: allowedPortsField.height * 2
                 tabChangesFocus: true
+
+                Accessible.name: qsTr("Enter one or more bridge relays (one per line):")
+                Accessible.role: Accessible.EditableText
             }
         }
     }
@@ -190,6 +252,9 @@ Column {
         Button {
             text: qsTr("Back")
             onClicked: window.back()
+
+            Accessible.name: text
+            Accessible.onPressAction: window.back()
         }
 
         Item { height: 1; Layout.fillWidth: true }
@@ -200,6 +265,9 @@ Column {
             onClicked: {
                 setup.save()
             }
+            
+            Accessible.name: text
+            Accessible.onPressAction: setup.save()
         }
     }
 }
