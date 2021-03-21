@@ -96,7 +96,7 @@ QString ContactIDValidator::hostnameFromID(const QString &ID)
     if (!match.hasMatch())
         return QString();
 
-    return match.captured(2) + QStringLiteral(".onion");
+    return match.captured(1) + QStringLiteral(".onion");
 }
 
 QString ContactIDValidator::idFromHostname(const QString &hostname)
