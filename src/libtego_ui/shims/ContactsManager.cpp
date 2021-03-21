@@ -21,7 +21,9 @@ namespace shims
 
         // check that the service id is valid before anything else
         if (tego_v3_onion_service_id_string_is_valid(serviceId.constData(), serviceId.size(), nullptr) != TEGO_TRUE)
+        {
             return nullptr;
+        }
 
         auto shimContact = this->addContact(serviceId, nickname);
 
