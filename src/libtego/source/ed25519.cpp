@@ -206,6 +206,21 @@ extern "C"
         }, error);
     }
 
+    tego_bool_t tego_v3_onion_service_id_string_is_valid(
+        const char* serviceIdString,
+        size_t serviceIdStringLength,
+        tego_error_t** error)
+    {
+        return tego::translateExceptions([&]() -> tego_bool_t
+        {
+            TEGO_THROW_IF_NULL(serviceIdString);
+
+            auto serviceId = std::make_unique<tego_v3_onion_service_id>(serviceIdString, serviceIdStringLength);
+            // if the constructor returns without throwing an error, then it's a valid id
+            return TEGO_TRUE;
+        }, error, TEGO_FALSE);
+    }
+
     void tego_v3_onion_service_id_from_string(
         tego_v3_onion_service_id_t** out_serviceId,
         const char* serviceIdString,
