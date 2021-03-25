@@ -237,7 +237,7 @@ extern "C"
             TEGO_THROW_IF_NULL(serviceIdString);
             TEGO_THROW_IF_FALSE(serviceIdStringLength >= TEGO_V3_ONION_SERVICE_ID_LENGTH);
 
-	        std::string_view serviceIdView(serviceIdString, TEGO_V3_ONION_SERVICE_ID_LENGTH);
+            std::string_view serviceIdView(serviceIdString, TEGO_V3_ONION_SERVICE_ID_LENGTH);
             return tego_v3_onion_service_id::is_valid(serviceIdView);
         }, error, TEGO_FALSE);
     }
