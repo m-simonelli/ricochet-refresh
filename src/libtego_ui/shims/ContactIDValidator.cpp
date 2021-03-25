@@ -77,8 +77,6 @@ namespace shims
 
     bool ContactIDValidator::isValidID(const QString &serviceID) const
     {
-        logger::trace();
-
         auto strippedID = serviceID.mid(tego::static_strlen("ricochet:"));
         logger::println("strippedID : {}", strippedID.toUtf8().constData(), strippedID.size());
 

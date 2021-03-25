@@ -113,7 +113,7 @@ void tego_ed25519_public_key_from_ed25519_private_key(
  * https://gitweb.torproject.org/torspec.git/tree/rend-spec-v3.txt
  *
  * @param serviceIdString : string containing the v3 service id to be validated
- * @param serviceIdStringLength : length of serviceIdString no counting the
+ * @param serviceIdStringLength : length of serviceIdString not counting the
  *  null terminator
  * @param error : filled on error
  */

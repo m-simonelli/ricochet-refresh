@@ -113,13 +113,9 @@ tego_bool_t tego_v3_onion_service_id::is_valid(
     tego::truncated_checksum_from_ed25519_public_key(truncatedChecksum, rawPublicKey);
 
     // verify the first two bytes of checksum in service id match our calculated checksum
-    auto validChecksum = false;
-    if (decodedServiceId[TEGO_V3_ONION_SERVICE_ID_CHECKSUM_OFFSET    ] == truncatedChecksum[0] &&
-        decodedServiceId[TEGO_V3_ONION_SERVICE_ID_CHECKSUM_OFFSET + 1] == truncatedChecksum[1])
-    {
-        validChecksum = true;
-    }
-
+    auto validChecksum =    decodedServiceId[TEGO_V3_ONION_SERVICE_ID_CHECKSUM_OFFSET    ] == truncatedChecksum[0] &&
+                            decodedServiceId[TEGO_V3_ONION_SERVICE_ID_CHECKSUM_OFFSET + 1] == truncatedChecksum[1];
+                            
     if (!validChecksum)
     {
         return TEGO_FALSE;
@@ -241,7 +237,7 @@ extern "C"
             TEGO_THROW_IF_NULL(serviceIdString);
             TEGO_THROW_IF_FALSE(serviceIdStringLength >= TEGO_V3_ONION_SERVICE_ID_LENGTH);
 
-	    std::string_view serviceIdView(serviceIdString, TEGO_V3_ONION_SERVICE_ID_LENGTH);
+	        std::string_view serviceIdView(serviceIdString, TEGO_V3_ONION_SERVICE_ID_LENGTH);
             return tego_v3_onion_service_id::is_valid(serviceIdView);
         }, error, TEGO_FALSE);
     }
