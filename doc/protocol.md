@@ -27,6 +27,7 @@ Ricochet uses Tor [hidden services][rend-spec] as a transport; the reader
 should be familiar with that architecture and the properties it provides. In
 particular:
 
+> TODO: This relates to rend-spec-v2
   * The hostname is calculated from a hash of the server's public key, and
     serves to authenticate the server without relying on a third party 
   * Connections are encrypted end-to-end, using the server's key and a DHE
@@ -39,6 +40,7 @@ particular:
 
 > TODO: We should explore additional cryptography on top of what Tor offers;
 > see [issue 72](https://github.com/ricochet-im/ricochet/issues/72).
+> TODO: the above probably no longer applies due to improvements with onion v3
 
 ##### Usage
 
@@ -167,6 +169,9 @@ supported versions must be at least 1. The server side of the connection must
 respond with a single byte for the selected version number, or 0xFF if no
 suitable version is found.
 
+> TODO: this (new) document is version 3
+> what version of ricochet does version number `1` relate to in the table
+> below?
 This document describes protocol version 1. Known versions are: 
 ```
 0                   The Ricochet 1.0 protocol
@@ -238,6 +243,7 @@ message OpenChannel {
 }
 ```
 
+> TODO: what additional data?
 Requests to open a channel of the type *channel_type*, using the identifier
 *channel_identifier* for packets. Additional data may be added in extensions to
 this message.
@@ -248,6 +254,7 @@ validity of any extension data. The recipient also checks whether this
 connection allows channels of this type; for example, if the peer is
 sufficiently authenticated.
 
+> TODO: Specify how channel_identifier is sent
 If the request is allowed, *channel_identifier* will be sent with packets
 destined for this channel within this connection. It is also used to associate
 the *ChannelResult* message with this request. There are several rules that
@@ -553,11 +560,12 @@ This proof is signed with the hidden service's ED25519-v3 private key to make
 
 The recipient of this message must:
 
-* Reject any message with a service_id field of an unexpected size * Reject any
-message with a signature field of an unexpected size * Decode the public_key,
-and calculate its 'onion' address per [rend-spec][rend-spec] * Build the proof
-message * Verify that *signature* is a valid signature of the proof by
-*public_key*
+  * Reject any message with a service_id field of an unexpected size
+  * Reject any message with a signature field of an unexpected size
+  * Decode the public_key, and calculate its 'onion' address per
+    [rend-spec][rend-spec]
+  * Build the proof message
+  * Verify that *signature* is a valid signature of the proof by *public_key*
 
 ##### Result
 ```protobuf
@@ -701,5 +709,5 @@ been received. Once either party receives this message, they remove internal
 state associated with the given transfer. Any subsequent messages referring to
 a complete transfer are ignored.
 
-[rend-spec]: https://gitweb.torproject.org/torspec.git/blob/HEAD:/rend-spec.txt
+[rend-spec]: https://gitweb.torproject.org/torspec.git/plain/rend-spec-v3.txt
 [protobuf]: https://code.google.com/p/protobuf/
