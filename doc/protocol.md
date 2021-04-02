@@ -27,20 +27,16 @@ Ricochet uses Tor [hidden services][rend-spec] as a transport; the reader
 should be familiar with that architecture and the properties it provides. In
 particular:
 
-> TODO: This relates to rend-spec-v2
-  * The hostname is calculated from a hash of the server's public key, and
-    serves to authenticate the server without relying on a third party 
-  * Connections are encrypted end-to-end, using the server's key and a DHE
-    handshake to provide forward secrecy
+  * The hostname is the base32 encoded form of the long term master identity
+    public key
+  * Connections are encrypted end-to-end using TLS/SSLv3, using the server's
+    key and a DHE handshake to provide forward secrecy
   * Both ends of a connection are anonymous in that neither peer should be able
     to identify or locate the other, and no relay should be able to connect an
     identity to the requests it makes
-  * Impersonating a server without its private key requires an 80-bit SHA1
-    collision using a valid RSA key
-
-> TODO: We should explore additional cryptography on top of what Tor offers;
-> see [issue 72](https://github.com/ricochet-im/ricochet/issues/72).
-> TODO: the above probably no longer applies due to improvements with onion v3
+> TODO: This doesn't phrase it well, emphasis is needed that impersonating a
+> server *is* possible
+  * Impersonating a server without a valid private key is impossible
 
 ##### Usage
 
@@ -169,13 +165,11 @@ supported versions must be at least 1. The server side of the connection must
 respond with a single byte for the selected version number, or 0xFF if no
 suitable version is found.
 
-> TODO: this (new) document is version 3
-> what version of ricochet does version number `1` relate to in the table
-> below?
-This document describes protocol version 1. Known versions are: 
+This document describes protocol version 3. Known versions are: 
 ```
-0                   The Ricochet 1.0 protocol
-1                   This document
+0                   The Ricochet <= 1.0.x protocol
+1                   The Ricochet >= 1.1.x protocol
+3                   This document (The Ricochet 3.x.x protocol)
 ```
 
 If the negotiation is successful, the connection can be immediately used to
@@ -243,10 +237,9 @@ message OpenChannel {
 }
 ```
 
-> TODO: what additional data?
 Requests to open a channel of the type *channel_type*, using the identifier
-*channel_identifier* for packets. Additional data may be added in extensions to
-this message.
+*channel_identifier* for packets. Additional data specific to, and defined by,
+the channel type may be added in extensions to this message.
 
 The recipient of an OpenChannel message checks whether it supports the
 *channel_type*, if the *channel_identifier* is valid and unassigned, and the
@@ -254,11 +247,10 @@ validity of any extension data. The recipient also checks whether this
 connection allows channels of this type; for example, if the peer is
 sufficiently authenticated.
 
-> TODO: Specify how channel_identifier is sent
-If the request is allowed, *channel_identifier* will be sent with packets
-destined for this channel within this connection. It is also used to associate
-the *ChannelResult* message with this request. There are several rules that
-must be followed when choosing or accepting a *channel_identifier*:
+If the request is allowed, a *ChannelResult* message will be sent with the
+*channel_identifier* field set to the requested *channel_identifier*, and the
+*opened* field set to true. There are several rules that must be followed when
+choosing or accepting a *channel_identifier*:
 
   * The client side of a connection may only open odd-numbered channels
   * The server side may only open even-numbered channels
